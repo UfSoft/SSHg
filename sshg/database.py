@@ -23,6 +23,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
 from twisted.python import log
 
+from sshg.utils.crypto import gen_pwhash
+
 
 def get_engine():
     """Return the active database engine (the database engine of the active
@@ -139,6 +141,7 @@ class User(DeclarativeBase):
     __tablename__ = 'repousers'
 
     username        = db.Column(db.String, primary_key=True)
+    password        = db.Column(db.String)
     added           = db.Column(db.DateTime, default=datetime.utcnow())
     last_login      = db.Column(db.DateTime, default=datetime.utcnow())
 
@@ -149,17 +152,17 @@ class User(DeclarativeBase):
                                   cascade="all, delete, delete-orphan")
     last_used_key   = db.relation("PublicKey", uselist=False)
 
-    #query = session().query_property(Query)
 
-    def __init__(self, username):
+    def __init__(self, username, password):
         self.username = username
+        self.password = gen_pwhash(password)
 
 
 class Session(DeclarativeBase):
     """Persistent Session Database"""
     __tablename__ = 'persistent_sessions'
+
     uid     = db.Column(db.String, primary_key=True)
     data    = db.Column(db.PickleType)
 
-    #query = session().query_property(Query)
 

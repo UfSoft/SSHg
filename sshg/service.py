@@ -13,40 +13,46 @@
 
 import sys
 from ConfigParser import SafeConfigParser
-from getpass import getpass
+import getpass
 from os import makedirs
 from os.path import abspath, basename, expanduser, isdir, isfile, join
+from types import ModuleType
 
 from twisted.application import internet
+from twisted.application.service import (IServiceMaker, Application,
+                                         IServiceCollection)
 from twisted.plugin import IPlugin
 from twisted.python import usage
-from twisted.application.service import IServiceMaker
-from types import ModuleType
 from zope.interface import implements
 
 from sshg import __version__, __summary__
 from sshg.checkers import MercurialPublicKeysDB
 from sshg.database import create_engine, metadata, session, User, PublicKey
-from sshg.factories import MercurialReposFactory
+from sshg.factories import MercurialReposFactory, ConfigurationFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
 
-sys.modules['sshg.config'] = config = ModuleType('config')
-sys.modules['sshg.application'] = application = ModuleType('application')
+from sshg import application
+from sshg import config
 
-def ask_password(calledback=None):
+class PasswordsDoNotMatch(Exception):
+    """Simple exception to catch non-matching passwords"""
+
+def ask_password(ask_pass_text=None, calledback=None):
     if calledback is not None:
-        return getpass("Please specify the password for the key: ")
+        # This is called automatically if it's OpenSSL asking for it
+        return getpass.getpass("Please specify the password for the key: ")
 
     # It's not a password being requested, it's a password to define
-    passwd = getpass("Define a password for the new private key "
-                     "(leave empty for none): ")
+    passwd = getpass.getpass(ask_pass_text or
+                             "Define a password for the new private key "
+                             "(leave empty for none): ")
     if not passwd:
         return None
     verify_password = getpass.getpass("Verify Password: ")
     if passwd != verify_password:
-        print "Passwords do not match. Exiting..."
-        sys.exit(1)
+        print "Passwords do not match!"
+        raise PasswordsDoNotMatch
     return passwd
 
 class BaseOptions(usage.Options):
@@ -69,20 +75,58 @@ class SetupOptions(BaseOptions):
             from OpenSSL import crypto
             privateKey = crypto.PKey()
             privateKey.generate_key(crypto.TYPE_RSA, 1024)
-            password = ask_password()
+            password = ''
+            while not password:
+                try:
+                    password = ask_password()
+                    break
+                except PasswordsDoNotMatch:
+                    # Passwords did not match
+                    pass
+
             encryption_args = password and ["DES-EDE3-CBC", password] or []
             privateKeyData = crypto.dump_privatekey(crypto.FILETYPE_PEM,
                                                     privateKey,
                                                     *encryption_args)
             open(config.private_key, 'w').write(privateKeyData)
 
+            print "Generating configuration server SSL certificate"
+            cert = crypto.X509()
+            subject = cert.get_subject()
+            subject.CN = 'SSHg Configuration Server'
+            #cert.set_subject(subject)
+            cert.set_pubkey(privateKey)
+            cert.set_serial_number(0)
+            cert.gmtime_adj_notBefore(0)
+            cert.gmtime_adj_notAfter(60 * 60 * 24 * 365 * 5) # Five Years
+            cert.set_issuer(subject)
+            cert.sign(privateKey, "md5")
+            certData = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+            open(config.certificate, 'w').write(certData)
+            print "Done. This certificate is valid for 5 years."
+            print "You can provide your own private key/certificate,"
+            print "just point to the correct paths on the configuration file."
+
+
         print "Creating Database"
         application.database_engine = create_engine()
         metadata.create_all(application.database_engine)
         print "Setup initial username"
-        username = raw_input("Username: ")
+        username = raw_input("Username [%s]: " % getpass.getuser())
+        if not username:
+            username = getpass.getuser()
+        password = None
+        while not password:
+            try:
+                password = ask_password('Define a password for "%s": ' %
+                                        username)
+                if not password:
+                    print "Password cannot not be empty"
+            except PasswordsDoNotMatch:
+                pass
+
         Session = session()
-        user = User(username)
+        user = User(username, password)
         pubkey_path = raw_input("Path to your public key [~/.ssh/id_rsa.pub]: ")
         if not pubkey_path:
             pubkey_path = expanduser('~/.ssh/id_rsa.pub')
@@ -106,7 +150,7 @@ class ServiceOptions(BaseOptions):
         realm = MercurialRepositoriesRealm()
         portal = MercurialRepositoriesPortal(realm)
         portal.registerChecker(MercurialPublicKeysDB())
-        factory = MercurialReposFactory(realm, portal, config)
+        factory = MercurialReposFactory(realm, portal)
         return internet.TCPServer(config.port, factory)
 
 class SSHgOptions(BaseOptions):
@@ -135,7 +179,9 @@ class SSHgOptions(BaseOptions):
             print "Creating configuration file with defaults: %r" % configfile
             parser.add_section('main')
             parser.set('main', 'port', '22')
+            parser.set('main', 'config_port', '8443')
             parser.set('main', 'private_key', '%(here)s/privatekey.pem')
+            parser.set('main', 'certificate', '%(here)s/certificate.pem')
 
             parser.add_section('database')
             parser.set('database', 'echo', 'false')
@@ -153,7 +199,10 @@ class SSHgOptions(BaseOptions):
 
         config.dir = configdir
         config.port = parser.getint('main', 'port')
+        config.config_port = parser.getint('main', 'config_port')
         config.private_key = abspath(parser.get('main', 'private_key'))
+        config.certificate = abspath(parser.get('main', 'certificate'))
+
         config.db = ModuleType('config.db')
         config.db.echo = parser.getboolean('database', 'echo')
         config.db.engine = parser.get('database', 'engine')
@@ -184,5 +233,16 @@ class SSHgService(object):
     options = SSHgOptions
 
     def makeService(self, options):
-        return options.subOptions.getService()
+        application = Application("Mercurial SSH Server") #, uid, gid)
+        services = IServiceCollection(application)
+        if options.subCommand == 'server':
+            # Run config server too?
+            config_factory = ConfigurationFactory()
+            config_service = internet.SSLServer(config.config_port,
+                                                config_factory,
+                                                config_factory)
+            config_service.setServiceParent(services)#
+        service = options.subOptions.getService()
+        service.setServiceParent(services)
+        return services
 

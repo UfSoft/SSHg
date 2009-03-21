@@ -17,4 +17,8 @@ __version__ = '0.1'
 __package__ = 'SSHg'
 __summary__ = "Mercurial repositories SSH server"
 
+import sys
+from types import ModuleType
 
+sys.modules['sshg.config'] = config = ModuleType('config')
+sys.modules['sshg.application'] = application = ModuleType('application')
