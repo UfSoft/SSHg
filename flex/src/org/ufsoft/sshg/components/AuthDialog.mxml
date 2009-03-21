@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                layout="vertical"
+                isPopUp="false"
+                styleName="authWindow"
+                creationComplete="creationComplete()"
+                title='{resourceManager.getString("sshg", "Authentication Required")}'>
+    <mx:Script>
+      import mx.managers.PopUpManager;
+      import mx.collections.ArrayCollection;
+
+      import mx.events.FlexEvent;
+
+      import mx.rpc.AbstractOperation;
+      import mx.rpc.events.FaultEvent;
+      import mx.rpc.events.ResultEvent;
+
+      import net.zengrong.logging.Firebug;
+
+      import org.ufsoft.sshg.i18n.Locale;
+      import org.ufsoft.sshg.models.AuthenticatedUser;
+      import org.ufsoft.sshg.events.AuthenticationEvent;
+      import org.ufsoft.sshg.events.TranslationEvent;
+
+      //[Bindable]
+      public var user           : AuthenticatedUser;
+
+      [Bindable]
+      public var languagesArray : ArrayCollection;
+
+      private var cookie : SharedObject = SharedObject.getLocal("SSHg");
+
+      protected function creationComplete():void {
+        PopUpManager.centerPopUp(this); // center the popup
+
+        // Set stored username if possible
+        username.text = cookie.data.username || '';
+
+        // Listen to key events to enable or not the authenticate button
+        addEventListener(KeyboardEvent.KEY_UP, submit_Ok);
+
+        // listen to authenticate button cliks to submit or Enter-key presses
+        authButton.addEventListener( MouseEvent.CLICK, submitFormMouseClick );
+        authForm.addEventListener( KeyboardEvent.KEY_DOWN, submitFormEnterKey );
+
+        if ( username.text != '' ) {
+          // Set focus on password
+          password.setFocus();
+        } else {
+          // Set focus on username
+          username.setFocus();
+        }
+
+        var operation: AbstractOperation=parentApplication.getOperation(
+          'locales.get_locales',
+          getLanguagesSucess);
+        operation.send();
+      }
+
+      private function getLanguagesSucess(event:ResultEvent):void {
+        languagesArray = event.result as ArrayCollection;
+        Firebug.debug(1, Locale.getInstance().getLocale());
+        for ( var i:int=0; i&lt;languagesArray.source.length; i++ ) {
+            if ( languagesArray.getItemAt(i).locale ==  Locale.getInstance().getLocale() ) {
+              languageCombo.selectedIndex = i;
+              break;
+            }
+          }
+      }
+
+      // Function to check if the authentication button should be enabled or not
+      private function submit_Ok(evt:KeyboardEvent):void {
+        if ( password.text.length > 0 &amp;&amp; username.text.length > 0) {
+          authButton.enabled = true;
+          username.errorString=null;
+          password.errorString=null;
+        } else {
+          authButton.enabled = false;
+          if ( username.text.length == 0 ) {
+            username.errorString="Username cannot be empty!";
+          }
+          if ( password.text.length == 0 ) {
+            password.errorString="Password cannot be empty!";
+          }
+        }
+      }
+
+      // Fire the submit form event
+      private function submitFormMouseClick(event:MouseEvent):void {
+        if ( authButton.enabled ) {
+          sendForm();
+        }
+      }
+
+      private function submitFormEnterKey(evt:KeyboardEvent):void {
+        if ( evt.keyCode == 13 &amp;&amp; authButton.enabled ) {
+          sendForm();
+        }
+      }
+
+      private function sendForm():void {
+        cookie.data.languageComboIndex = languageCombo.selectedIndex;
+        cookie.data.username = username.text;
+        cookie.data.locale = Locale.getInstance().getLocale();
+        cookie.flush();
+        user = new AuthenticatedUser(
+          username.text,
+          password.text,
+          languageCombo.selectedItem.locale);
+        dispatchEvent(new AuthenticationEvent(AuthenticationEvent.SEND, user));
+      }
+
+      private function languageSelectionChanged():void {
+        Locale.getInstance().load(languageCombo.selectedItem.locale);
+      }
+
+    </mx:Script>
+
+    <mx:Form id="authForm">
+        <mx:FormItem id="usernameItem"
+                     label='{resourceManager.getString("sshg", "Username:")}'>
+            <mx:TextInput id="username"/>
+        </mx:FormItem>
+        <mx:FormItem id="passwordItem"
+                     label='{resourceManager.getString("sshg", "Password:")}'>
+            <mx:TextInput id="password" displayAsPassword="true"/>
+        </mx:FormItem>
+        <mx:FormItem id="language"
+                     label='{resourceManager.getString("sshg", "Language:")}'>
+            <mx:ComboBox id="languageCombo" dataProvider="{languagesArray}"
+                         labelField="label" change="languageSelectionChanged()"/>
+        </mx:FormItem>
+        <mx:Button label='{resourceManager.getString("sshg", "Authenticate")}'
+                   id ="authButton" enabled="false" width="100%"/>
+        <mx:TextArea width="100%" height="100" textAlign="justify" condenseWhite="true">
+            <mx:htmlText><![CDATA[
+                <b><p>This system is for the use of authorized users only.
+                Individuals using this computer system without authority, or
+                in excess of their authority, are subject to having all of
+                their activities on this system monitored and recorded.</p>
+
+                <p>In the course of monitoring individuals improperly using this system,
+                or in the course of system maintenance, the activities of authorised
+                users may also be monitored.</p>
+
+                <p>Anyone using this system expressly consents to such monitoring and is
+                advised that if such monitoring reveals possible evidence of criminal
+                activity, system personnel may provide the evidence of such monitoring
+                to law enforcement officials.</p></b>]]>
+            </mx:htmlText>
+        </mx:TextArea>
+    </mx:Form>
+</mx:TitleWindow>

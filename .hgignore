@@ -4,3 +4,4 @@ syntax:glob
 .conf
 twistd.*
 **/dropin.cache
+**/*.mo

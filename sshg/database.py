@@ -23,7 +23,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
 from twisted.python import log
 
-from sshg.utils.crypto import gen_pwhash
+from sshg.utils.crypto import gen_pwhash, check_pwhash
 
 
 def get_engine():
@@ -157,6 +157,11 @@ class User(DeclarativeBase):
         self.username = username
         self.password = gen_pwhash(password)
 
+    def authenticate(self, password):
+        valid = check_pwhash(self.password, password)
+        if valid:
+            self.last_login = datetime.utcnow()
+        return valid
 
 class Session(DeclarativeBase):
     """Persistent Session Database"""

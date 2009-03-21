@@ -1,0 +1,47 @@
+# Translations template for SSHg.
+# Copyright (C) 2009 UfSoft.org
+# This file is distributed under the same license as the SSHg project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2009.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: SSHg 0.1\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2009-03-21 04:49+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 1.0dev-r467\n"
+
+#: flex/src/sshg.mxml:234
+msgid "Authentication Failed {0}"
+msgstr ""
+
+#: flex/src/sshg.mxml:166
+msgid "Logout"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:123
+msgid "Username:"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:127
+msgid "Password:"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:132
+msgid "Language:"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:134
+msgid "Authenticate"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:153
+msgid "Authentication Required"
+msgstr ""
+

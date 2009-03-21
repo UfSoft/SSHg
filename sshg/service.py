@@ -198,6 +198,7 @@ class SSHgOptions(BaseOptions):
         parser.set('DEFAULT', 'here', configdir)
 
         config.dir = configdir
+        config.static_dir = abspath(parser.get('main', 'static_dir'))
         config.port = parser.getint('main', 'port')
         config.config_port = parser.getint('main', 'config_port')
         config.private_key = abspath(parser.get('main', 'private_key'))
