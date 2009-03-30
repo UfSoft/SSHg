@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SSHg 0.1\n"
 "Report-Msgid-Bugs-To: project@ufsoft.org\n"
-"POT-Creation-Date: 2009-03-21 04:49+0000\n"
-"PO-Revision-Date: 2009-03-21 04:51+0000\n"
+"POT-Creation-Date: 2009-03-30 16:36+0100\n"
+"PO-Revision-Date: 2009-03-30 16:36+0100\n"
 "Last-Translator: Pedro Algarvio <ufs@ufsoft.org>\n"
 "Language-Team: pt_PT <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
@@ -17,31 +17,71 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 1.0dev-r467\n"
 
-#: flex/src/sshg.mxml:234
+#: flex/src/sshg.mxml:272
 msgid "Authentication Failed {0}"
 msgstr "Autenticação Falhou {0}"
 
-#: flex/src/sshg.mxml:166
+#: flex/src/sshg.mxml:191
+msgid "Users"
+msgstr "Utilizadores"
+
+#: flex/src/sshg.mxml:193
+msgid "Add User"
+msgstr "Adicionar Utilizador"
+
+#: flex/src/sshg.mxml:195
+msgid "Repositories"
+msgstr "Repositório"
+
+#: flex/src/sshg.mxml:197
+msgid "Add Repository"
+msgstr "Adicionar Repositório"
+
+#: flex/src/sshg.mxml:200
 msgid "Logout"
 msgstr "Sair"
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:123
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:125
 msgid "Username:"
 msgstr "Nome de Utilizador"
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:127
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:129
 msgid "Password:"
 msgstr "Palavra-passe:"
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:132
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:134
 msgid "Language:"
 msgstr "Linguagem:"
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:134
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:136
 msgid "Authenticate"
 msgstr "Autenticar"
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:153
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:155
 msgid "Authentication Required"
 msgstr "Autenticação Requerida"
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:57
+msgid "Username"
+msgstr "Nome de Utilizador"
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:59
+msgid "Added On"
+msgstr "Adicionado Em"
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:61
+msgid "Last Login"
+msgstr "Última Entrada"
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:63
+msgid "Is Administrator"
+msgstr "É Administrador"
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:65
+msgid "Locked Out"
+msgstr "Bloqueado"
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:68
+msgid "Users List"
+msgstr "Lista de Utilizadores"
 

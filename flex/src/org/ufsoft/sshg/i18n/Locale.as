@@ -60,25 +60,31 @@ package org.ufsoft.sshg.i18n {
 
     public function loadComplete(event:ResultEvent):void {
       dispatchEvent(new TranslationEvent(
-        TranslationEvent.PARSE, getLocale(), event.result as Array));
+        TranslationEvent.PARSE, getLocale(), new Array(event.result)));
     }
 
     private function parseTranslation(event:TranslationEvent):void {
       Firebug.debug("Parsing locale " + event.locale);
+      //Firebug.debug("Translations Received:", event.translations);
       rb = new ResourceBundle(event.locale, this.bundle);
-      for each (var item:Object in event.translations ) {
+      //Firebug.debug(1, event.translations[0][0]);
+      for each (var item:Object in event.translations[0] ) {
         //trace(item);
-        //Firebug.debug(item);
+        //Firebug.debug('Tranlation Item', item);
         rb.content[item.msgid] = item.msgstr;
       }
       ResourceManager.getInstance().addResourceBundle(rb);
-      Firebug.debug("Loaded locale " + getLocale());
+      Firebug.debug("Locale " + getLocale() + " parsed.");
       dispatchEvent(new TranslationEvent(
         TranslationEvent.LOADED, event.locale, event.translations));
     }
 
     private function translationLoaded(event:TranslationEvent):void {
-      ResourceManager.getInstance().localeChain = [event.locale, 'en_US'];
+      if ( event.locale != 'en_US' ) {
+        ResourceManager.getInstance().localeChain = [event.locale, 'en_US'];
+      } else {
+        ResourceManager.getInstance().localeChain = [event.locale];
+      }
       this.loaded = true;
       ResourceManager.getInstance().update();
       Firebug.debug("Loaded locale " + getLocale());

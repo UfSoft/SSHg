@@ -59,7 +59,7 @@
 
       private function getLanguagesSucess(event:ResultEvent):void {
         languagesArray = event.result as ArrayCollection;
-        Firebug.debug(1, Locale.getInstance().getLocale());
+        Firebug.debug("Current Locale:", Locale.getInstance().getLocale());
         for ( var i:int=0; i&lt;languagesArray.source.length; i++ ) {
             if ( languagesArray.getItemAt(i).locale ==  Locale.getInstance().getLocale() ) {
               languageCombo.selectedIndex = i;
@@ -112,6 +112,8 @@
 
       private function languageSelectionChanged():void {
         Locale.getInstance().load(languageCombo.selectedItem.locale);
+        cookie.data.locale = Locale.getInstance().getLocale();
+        cookie.flush();
       }
 
     </mx:Script>

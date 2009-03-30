@@ -14,7 +14,7 @@
 from sshg.remoting import *
 from sshg.database import User
 
-log = logging.getLogger(__name__)
+log = logger.getLogger(__name__)
 
 class AuthenticationNeeded(Exception):
     """Exception which triggers the required authentication code on the

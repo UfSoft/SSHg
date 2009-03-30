@@ -10,20 +10,21 @@
     :license: BSD, see LICENSE for more details.
 """
 
-import logging
 from twisted.internet.threads import defer, deferToThread
 from twisted.web.resource import Resource
 from pyamf.remoting.gateway import expose_request
 from pyamf.flex import ArrayCollection
 from sshg.database import require_session
+from sshg import logger
 
-__all__ = ['logging', 'defer', 'deferToThread', 'expose_request', 'Resource',
+__all__ = ['logger', 'defer', 'deferToThread', 'expose_request', 'Resource',
            'require_session', 'ArrayCollection']
 
 
-from sshg.remoting import auth, locales
+from sshg.remoting import auth, locales, users
 
 services = {
     'SSHg.auth'     : auth.Authentication(),
-    'SSHg.locales'  : locales.LocalesResource()
+    'SSHg.locales'  : locales.LocalesResource(),
+    'SSHg.users'    : users.UsersResource()
 }

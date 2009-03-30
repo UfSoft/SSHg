@@ -12,9 +12,10 @@
 
 from twisted.conch.ssh import session, channel
 from twisted.internet import reactor
-from twisted.python import log
 from zope.interface import implements
+from sshg import logger
 
+log = logger.getLogger(__name__)
 
 class FixedSSHSession(session.SSHSession):
     def loseConnection(self):
@@ -37,7 +38,7 @@ class MercurialSession(object):
     hg_process_pid = None
 
     def __init__(self, avatar):
-        log.msg("Initiated Mercurial Session: %s" % avatar.username)
+        log.debug("Initiated Mercurial Session: %s" % avatar.username)
         self.avatar = avatar
         self.factory = avatar.factory
 

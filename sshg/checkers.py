@@ -17,12 +17,16 @@ from twisted.cred.error import UnauthorizedLogin
 from twisted.python import failure, log
 
 from sshg.database import User, require_session
+from sshg import logger
+
+log = logger.getLogger(__name__)
 
 class MercurialPublicKeysDB(SSHPublicKeyDatabase):
 
     @require_session
     def checkKey(self, credentials, session=None):
         user = session.query(User).get(credentials.username)
+        log.debug("User %s trying to authenticate" % credentials.username)
         if not user:
             return False
         for pubKey in user.keys:

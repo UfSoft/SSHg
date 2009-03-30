@@ -5,8 +5,7 @@
                 width="100%"
                 height="100%"
                 layout="vertical"
-                initialize="setupInitialLocale()"
-                creationComplete="creationComplete()">
+                initialize="setupInitialLocale()">
 
     <mx:Style source="styles/style.css" />
 
@@ -15,6 +14,7 @@
       // UI related imports
       import mx.controls.Alert;
       import mx.managers.PopUpManager;
+      import flash.display.DisplayObject;
 
       // Remoting suff imports
       import mx.messaging.ChannelSet;
@@ -24,29 +24,40 @@
       import mx.rpc.events.ResultEvent;
       import mx.rpc.remoting.mxml.RemoteObject;
 
+      import net.zengrong.logging.Firebug;
+
       import org.ufsoft.sshg.i18n.Locale;
       import org.ufsoft.sshg.models.AuthenticatedUser;
+      import org.ufsoft.sshg.events.TranslationEvent;
       import org.ufsoft.sshg.events.AuthenticationEvent;
       import org.ufsoft.sshg.components.AuthDialog;
+      //import org.ufsoft.sshg.components.UsersList;
 
       private var authDialog    : AuthDialog;
       public var cookie         : SharedObject;
+      private var _currentChild : DisplayObject;
 
       private var locale        : Locale;
       private var user          : AuthenticatedUser;
+      //private var usersList     : UsersList;
 
       [Event(name="ConnectionLost", type="Event")]
 
       private function setupInitialLocale():void {
         cookie = SharedObject.getLocal("SSHg");
-        locale = Locale.getInstance()
+        Firebug.debug("Cookie:", cookie.data);
+        locale = Locale.getInstance();
+        locale.addEventListener(TranslationEvent.LOADED, localeLoaded);
         locale.load(cookie.data.locale || 'en_US');
-      }
-
-      private function creationComplete() : void {
         addEventListener(AuthenticationEvent.NEEDED, authenticationNeeded);
         addEventListener(AuthenticationEvent.SEND, authenticate);
-        //addEventListener(AuthenticationEvent.SUCESS, displayOverview);
+      }
+
+      private function localeLoaded(event:TranslationEvent) : void {
+        locale.removeEventListener(TranslationEvent.LOADED, localeLoaded);
+        Firebug.debug("Should have loaded locale???");
+        Firebug.debug("Locale Chain:", resourceManager.localeChain);
+
 
         // Test with a fake user for existing session
         dispatchEvent(new AuthenticationEvent(
@@ -145,6 +156,7 @@
        * @param event Event containing error information.
        */
       protected function onServiceFault(event : FaultEvent) : void {
+        Firebug.debug(0, event.fault.faultCode);
         if (event.fault.faultCode == 'AuthenticationNeeded') {
           dispatchEvent(new AuthenticationEvent(AuthenticationEvent.NEEDED));
         } else if (event.fault.faultCode == 'Client.Error.MessageSent') {
@@ -158,12 +170,36 @@
           Alert.show(event.fault.faultDetail, errorMsg);
         }
       }
+
+      private function switchContent(content:DisplayObject): void {
+        if ( _currentChild ) {
+          mainContent.removeChild(_currentChild);
+        }
+        _currentChild = content;
+        mainContent.addChild(content);
+      }
+
+      private function showUsersList(event:Event):void {
+        /*usersList = new UsersList();
+        switchContent(usersList);*/
+      }
+
     </mx:Script>
     <mx:ApplicationControlBar width="100%" dock="true" id="appControlBar">
         <mx:HBox width="100%">
+            <mx:Button id="show_users" click="showUsersList(event)"
+                       label='{resourceManager.getString("sshg", "Users")}'/>
+            <mx:Button id="add_user"
+                       label='{resourceManager.getString("sshg", "Add User")}'/>
+            <mx:Button id="show_repos"
+                       label='{resourceManager.getString("sshg", "Repositories")}'/>
+            <mx:Button id="add_repos"
+                       label='{resourceManager.getString("sshg", "Add Repository")}'/>
             <mx:Spacer width="100%"/>
             <mx:Button id="logout"
                        label='{resourceManager.getString("sshg", "Logout")}'/>
         </mx:HBox>
     </mx:ApplicationControlBar>
+    <mx:Box id="mainContent" width="100%" height="100%"/>
+
 </mx:Application>

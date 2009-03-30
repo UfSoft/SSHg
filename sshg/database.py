@@ -21,9 +21,13 @@ import sqlalchemy
 from sqlalchemy import orm
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
-from twisted.python import log
 
+from sshg import logger
 from sshg.utils.crypto import gen_pwhash, check_pwhash
+
+from twisted.python import log as twlog
+
+log = logger.getLogger(__name__)
 
 
 def get_engine():
@@ -73,7 +77,7 @@ def require_session(f):
         try:
             return f(session=current_session, *args, **kwargs)
         except:
-            log.err()
+            twlog.err()
             current_session.rollback()
         finally:
             current_session.close()
@@ -92,15 +96,36 @@ del key, mod, value
 DeclarativeBase = declarative_base()
 metadata = DeclarativeBase.metadata
 
+
 repousers_association = db.Table('repositories_users_association', metadata,
     db.Column('user_id', None, db.ForeignKey("repousers.username")),
-    db.Column('repo_id', None, db.ForeignKey("repositories.name"))
+    db.Column('repo_id', None, db.ForeignKey("repositories.name")),
 )
 
-repokeys_association = db.Table('repositories_keys_association', metadata,
-    db.Column('key_id', None, db.ForeignKey("pubkeys.key")),
-    db.Column('repo_id', None, db.ForeignKey("repositories.name"))
+repomanagers_association = db.Table('repositories_managers_association', metadata,
+    db.Column('user_id', None, db.ForeignKey("repousers.username")),
+    db.Column('repo_id', None, db.ForeignKey("repositories.name")),
 )
+
+
+#repousers_association = db.Table('repositories_users_association', metadata,
+#    db.Column('user_id', None, db.ForeignKey("repousers.username"), primary_key=True),
+#    db.Column('repo_id', None, db.ForeignKey("repositories.name"), primary_key=True),
+#    db.Column('is_manager', db.Boolean, default=False)
+#)
+#
+#class RepoUser(object):
+#    pass
+#
+#db.mapper(RepoUser, repousers_association, properties=dict(
+#    users = db.relation("User", backref="assoc"),
+#    repos = db.relation("Repository", backref="assoc"),
+#))
+
+#repomanagers_association = db.Table('repo_managers_association', metadata,
+#    db.Column('key_id', None, db.ForeignKey("pubkeys.key")),
+#    db.Column('repo_id', None, db.ForeignKey("repositories.name"))
+#)
 
 
 class Repository(DeclarativeBase):
@@ -110,11 +135,32 @@ class Repository(DeclarativeBase):
 
     name    = db.Column(db.String, primary_key=True)
     path    = db.Column(db.String, unique=True)
+    size    = db.Column(db.Integer, default=0)
+    quota   = db.Column(db.Integer, default=0)
     added   = db.Column(db.DateTime, default=datetime.utcnow())
 
-    keys    = db.relation("PublicKey", secondary=repokeys_association,
-                          backref="repositories")
+    # Relationships
+#    keys    = db.relation("PublicKey", secondary=repokeys_association,
+#                          backref="repositories")
+    users   = db.relation("User", secondary=repousers_association,
+                          backref="repos")
+    managers = db.relation("User", secondary=repomanagers_association)
 
+    def __init__(self, name, repo_path, size=0, quota=0):
+        self.name = name
+        self.path = repo_path
+        self.size = size
+        self.quota = quota
+
+#class RepoUsers(DeclarativeBase):
+#
+#    __tablename__ = 'repositories_users_association'
+#
+#    user_id       = db.Column(db.ForeignKey("repousers.username"),
+#                              primary_key=True, backref='assoc'),
+#    repo_id       = db.Column(db.ForeignKey("repositories.name"),
+#                              primary_key=True, backref='assoc'),
+#    is_manager    = db.Column(db.Boolean, default=False)
 
 class PublicKey(DeclarativeBase):
     """Users Public Keys"""
@@ -126,8 +172,8 @@ class PublicKey(DeclarativeBase):
     used_on = db.Column(db.DateTime, default=datetime.utcnow())
     user_id = db.Column(db.ForeignKey('repousers.username'))
 
-    # Many to Many Relation set elsewere
-    repositories = None
+#    # Many to Many Relation set elsewere
+#    repositories = None
 
     def __init__(self, key_contents):
         self.key = key_contents
@@ -135,6 +181,11 @@ class PublicKey(DeclarativeBase):
     def update_stamp(self):
         self.used_on = datetime.utcnow()
 
+#class Managers(DeclarativeBase):
+#    """Administrators Table"""
+#    __tablename__ = 'repo_managers'
+#
+#    user_id = db.Column(db.ForeignKey('repousers.username'))
 
 class User(DeclarativeBase):
     """Repositories users table"""
@@ -144,18 +195,21 @@ class User(DeclarativeBase):
     password        = db.Column(db.String)
     added           = db.Column(db.DateTime, default=datetime.utcnow())
     last_login      = db.Column(db.DateTime, default=datetime.utcnow())
+    locked_out      = db.Column(db.Boolean, default=False)
+    is_admin        = db.Column(db.Boolean, default=False)
 
     # Relationships
-    repositories    = db.relation("Repository", secondary=repousers_association,
-                                  backref="users")
+#    repositories    = db.relation("Repository", secondary=repousers_association,
+#                                  backref="users")
     keys            = db.relation("PublicKey", backref="owner",
                                   cascade="all, delete, delete-orphan")
     last_used_key   = db.relation("PublicKey", uselist=False)
 
 
-    def __init__(self, username, password):
+    def __init__(self, username, password, is_admin=False):
         self.username = username
         self.password = gen_pwhash(password)
+        self.is_admin = is_admin
 
     def authenticate(self, password):
         valid = check_pwhash(self.password, password)

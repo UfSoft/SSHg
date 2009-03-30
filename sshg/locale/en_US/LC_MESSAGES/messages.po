@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SSHg 0.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2009-03-21 04:49+0000\n"
+"POT-Creation-Date: 2009-03-30 16:36+0100\n"
 "PO-Revision-Date: 2009-03-21 04:16+0000\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: en_US <LL@li.org>\n"
@@ -17,31 +17,71 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 1.0dev-r467\n"
 
-#: flex/src/sshg.mxml:234
+#: flex/src/sshg.mxml:272
 msgid "Authentication Failed {0}"
 msgstr ""
 
-#: flex/src/sshg.mxml:166
+#: flex/src/sshg.mxml:191
+msgid "Users"
+msgstr ""
+
+#: flex/src/sshg.mxml:193
+msgid "Add User"
+msgstr ""
+
+#: flex/src/sshg.mxml:195
+msgid "Repositories"
+msgstr ""
+
+#: flex/src/sshg.mxml:197
+msgid "Add Repository"
+msgstr ""
+
+#: flex/src/sshg.mxml:200
 msgid "Logout"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:123
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:125
 msgid "Username:"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:127
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:129
 msgid "Password:"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:132
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:134
 msgid "Language:"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:134
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:136
 msgid "Authenticate"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:153
+#: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:155
 msgid "Authentication Required"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:57
+msgid "Username"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:59
+msgid "Added On"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:61
+msgid "Last Login"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:63
+msgid "Is Administrator"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:65
+msgid "Locked Out"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:68
+msgid "Users List"
 msgstr ""
 

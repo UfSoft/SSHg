@@ -25,15 +25,13 @@ from twisted.plugin import IPlugin
 from twisted.python import usage
 from zope.interface import implements
 
-from sshg import __version__, __summary__
+from sshg import __version__, __summary__, application, config
 from sshg.checkers import MercurialPublicKeysDB
 from sshg.database import create_engine, metadata, session, User, PublicKey
 from sshg.factories import MercurialReposFactory, ConfigurationFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
 
-from sshg import application
-from sshg import config
 
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
@@ -126,7 +124,7 @@ class SetupOptions(BaseOptions):
                 pass
 
         Session = session()
-        user = User(username, password)
+        user = User(username, password, is_admin=True)
         pubkey_path = raw_input("Path to your public key [~/.ssh/id_rsa.pub]: ")
         if not pubkey_path:
             pubkey_path = expanduser('~/.ssh/id_rsa.pub')
@@ -180,6 +178,8 @@ class SSHgOptions(BaseOptions):
             parser.add_section('main')
             parser.set('main', 'port', '22')
             parser.set('main', 'config_port', '8443')
+            parser.set('main', 'discover_port', '8444')
+            parser.set('main', 'host_port', '8445')
             parser.set('main', 'private_key', '%(here)s/privatekey.pem')
             parser.set('main', 'certificate', '%(here)s/certificate.pem')
 
@@ -201,6 +201,8 @@ class SSHgOptions(BaseOptions):
         config.static_dir = abspath(parser.get('main', 'static_dir'))
         config.port = parser.getint('main', 'port')
         config.config_port = parser.getint('main', 'config_port')
+        config.discover_port = parser.getint('main', 'discover_port')
+        config.host_port = parser.getint('main', 'host_port')
         config.private_key = abspath(parser.get('main', 'private_key'))
         config.certificate = abspath(parser.get('main', 'certificate'))
 
@@ -242,7 +244,7 @@ class SSHgService(object):
             config_service = internet.SSLServer(config.config_port,
                                                 config_factory,
                                                 config_factory)
-            config_service.setServiceParent(services)#
+            config_service.setServiceParent(services)
         service = options.subOptions.getService()
         service.setServiceParent(services)
         return services

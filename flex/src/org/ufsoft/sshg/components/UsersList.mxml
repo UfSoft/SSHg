@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml"
+          xmlns:controls="org.ufsoft.sshg.controls.*"
+          layout="vertical"
+          styleName="noPadding" width="100%"
+          title='{resourceManager.getString("sshg", "Users List")}'
+          creationComplete="creationComplete()">
+    <mx:Script>
+      import flash.events.Event;
+      import flash.net.registerClassAlias;
+      import mx.collections.ArrayCollection;
+
+      import mx.rpc.AbstractOperation;
+      import mx.rpc.events.ResultEvent;
+
+      import org.ufsoft.sshg.models.RepositoryUser;
+
+
+      [Bindable]
+      private var users     : ArrayCollection;
+
+      [Event(name="LoadUsers", type="Event")]
+      [Event(name="UsersLoaded", type="Event")]
+
+      private function creationComplete():void {
+        //registerClassAlias(RepositoryUser.ALIAS, RepositoryUser);
+        addEventListener("LoadUsers", loadUsers);
+        dispatchEvent(new Event("LoadUsers"));
+      }
+
+      private function loadUsers(event:Event):void {
+        var operation:AbstractOperation = parentApplication.getOperation(
+          'users.get_all', updateUsersList);
+        operation.send();
+      }
+
+      private function updateUsersList(event:ResultEvent):void {
+        users = event.result as ArrayCollection;
+      }
+
+      private function styleFunction(item:Object, rowIndex:int,
+                                     dataIndex:int, color:uint):uint {
+        if ( item.is_admin ) {
+          return 0xCCFFCC;
+        }
+        if ( item.locked_out ) {
+          return 0xFFCCCC;
+        }
+        return color;
+      }
+    </mx:Script>
+
+    <controls:RowColorDataGrid id="usersList" rowCount="1" width="100%"
+                               dataProvider="{users}" rowColorFunction="styleFunction">
+        <controls:columns>
+            <mx:DataGridColumn dataField="username"
+                               headerText='{resourceManager.getString("sshg", "Username")}'/>
+            <mx:DataGridColumn dataField="added"
+                               headerText='{resourceManager.getString("sshg", "Added On")}'/>
+            <mx:DataGridColumn dataField="last_login"
+                               headerText='{resourceManager.getString("sshg", "Last Login")}'/>
+            <mx:DataGridColumn dataField="is_admin"
+                               headerText='{resourceManager.getString("sshg", "Is Administrator")}'/>
+            <mx:DataGridColumn dataField="locked_out"
+                               headerText='{resourceManager.getString("sshg", "Locked Out")}'/>
+        </controls:columns>
+    </controls:RowColorDataGrid>
+</mx:Panel>

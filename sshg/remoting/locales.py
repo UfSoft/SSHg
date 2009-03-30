@@ -10,7 +10,7 @@ from babel.messages.mofile import read_mo
 from sshg import config
 from sshg.remoting import *
 
-log = logging.getLogger(__name__)
+log = logger.getLogger(__name__)
 
 class LocalesResource(Resource):
 
@@ -25,6 +25,7 @@ class LocalesResource(Resource):
                     {'msgid': msg.id,
                      'msgstr': msg.string and msg.string or msg.id})
                 request.session.locale = locale
+            log.debug(translations);
             return translations
 
         return defer.maybeDeferred(_get_translations)

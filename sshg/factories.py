@@ -20,7 +20,6 @@ from twisted.web.server import Site
 from twisted.web.static import File
 
 from babel.core import Locale
-from babel.messages.mofile import read_mo
 from babel.support import Translations
 
 from pyamf.remoting.gateway import expose_request
@@ -28,16 +27,14 @@ from pyamf.remoting.gateway.twisted import TwistedGateway
 
 from OpenSSL import SSL
 
-from sshg import config
+import pyamf
+from pyamf import amf3
+
+from sshg import config, logger, database
 from sshg.remoting import services
 from sshg.remoting.auth import AuthenticationNeeded
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s %(levelname)-5.5s [%(name)s] %(message)s'
-)
-
-log = logging.getLogger(__name__)
+log = logger.getLogger(__name__)
 
 class MercurialReposFactory(factory.SSHFactory):
 
@@ -60,7 +57,30 @@ class ConfigurationFactory(Site):
     def __init__(self, logPath=None, timeout=60*60*12):
         resource = self.build_resources()
         Site.__init__(self, resource, logPath, timeout)
+        self.setup_pyamf()
         self.setup_translations()
+
+    def setup_pyamf(self):
+        # Setup PyAMF
+        # Set this to true so that returned objects and arrays are bindable
+        amf3.use_proxies_default = True
+
+        class RepositoryUserClassAlias(pyamf.ClassAlias):
+            def createInstance(self, codec=None, *args, **kwargs):
+                log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
+                return database.User(args[0], kwargs)
+
+            def checkClass(self, klass):
+                pass
+
+        pyamf.register_alias_type(RepositoryUserClassAlias, database.User)
+
+        MODELS_NAMESPACE = "org.ufsoft.sshg.models"
+
+#        pyamf.register_class(database.User,
+#                             "%s.RepositoryUser" % MODELS_NAMESPACE,
+#                             attrs=['username', 'password', 'added',
+#                                    'last_login', 'is_admin', 'locked_out'])
 
     def setup_translations(self):
         config.locales = {}
@@ -96,20 +116,20 @@ class ConfigurationFactory(Site):
 
         gateway = TwistedGateway(services, expose_request=False,
                                  preprocessor=self.preprocessor)
-        gateway.logger = logging.getLogger('sshg.pyamf')
+        gateway.logger = logger.getLogger('sshg.pyamf')
         root.putChild('services', gateway)
         return root
 
     @expose_request
     def preprocessor(self, request, service_request, *args, **kwargs):
-        print '\n\n\n Preprocess', args, kwargs
+        log.debug('\n\n\n Preprocess %s %s' % (args, kwargs))
         try:
             if not request.session:
                 request.getSession()
             request.factory = self
 
             user = getattr(request.session, 'user', None)
-            locale = user and user.locale or 'en_US'
+            locale = user and getattr(user, 'locale', 'en_US') or 'en_US'
             if getattr(request.session, 'locale', None) != locale:
                 request.session.locale = locale
                 request.session.translations = Translations(

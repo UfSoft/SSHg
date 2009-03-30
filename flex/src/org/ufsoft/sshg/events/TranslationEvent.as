@@ -15,11 +15,11 @@ package org.ufsoft.sshg.events {
     public var translations : Array;
 
     public function TranslationEvent (
-      type      :String,
-      locale    :String=null,
+      type          : String,
+      locale        : String = null,
       translations  : Array = null,
-      bubbles   :Boolean = true,
-      cancelable:Boolean = false
+      bubbles       : Boolean = true,
+      cancelable    : Boolean = false
       )
     {
       super(type, bubbles, cancelable);
@@ -32,5 +32,4 @@ package org.ufsoft.sshg.events {
     }
   }
 }
-
 
