@@ -25,9 +25,12 @@ from twisted.plugin import IPlugin
 from twisted.python import usage
 from zope.interface import implements
 
+from pyamf import register_class
+
 from sshg import __version__, __summary__, application, config
 from sshg.checkers import MercurialPublicKeysDB
-from sshg.database import create_engine, metadata, session, User, PublicKey
+from sshg.database import (create_engine, metadata, session, User, PublicKey,
+                           Repository)
 from sshg.factories import MercurialReposFactory, ConfigurationFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm

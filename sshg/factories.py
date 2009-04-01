@@ -18,6 +18,7 @@ from twisted.conch.ssh import factory, keys
 from twisted.web.resource import Resource
 from twisted.web.server import Site
 from twisted.web.static import File
+from twisted.internet import reactor
 
 from babel.core import Locale
 from babel.support import Translations
@@ -27,10 +28,10 @@ from pyamf.remoting.gateway.twisted import TwistedGateway
 
 from OpenSSL import SSL
 
-import pyamf
-from pyamf import amf3
+from pyamf import amf3, register_class
 
-from sshg import config, logger, database
+from sshg import config, logger
+from sshg.database import Repository, User, PublicKey
 from sshg.remoting import services
 from sshg.remoting.auth import AuthenticationNeeded
 
@@ -65,22 +66,16 @@ class ConfigurationFactory(Site):
         # Set this to true so that returned objects and arrays are bindable
         amf3.use_proxies_default = True
 
-        class RepositoryUserClassAlias(pyamf.ClassAlias):
-            def createInstance(self, codec=None, *args, **kwargs):
-                log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
-                return database.User(args[0], kwargs)
+        SSH_AMF_MODEL_NAMESPACE = "org.ufsoft.sshg.models"
 
-            def checkClass(self, klass):
-                pass
+        register_class(Repository, '%s.Repository' % SSH_AMF_MODEL_NAMESPACE,
+                       attrs=['name', 'path', 'size', 'quota'])
+        register_class(User, '%s.User' % SSH_AMF_MODEL_NAMESPACE,
+                       attrs=['username', 'password', 'added',
+                              'last_login', 'is_admin', 'locked_out'])
+        register_class(PublicKey, '%s.PublicKey' % SSH_AMF_MODEL_NAMESPACE,
+                       attrs=['key', 'added', 'used_on'])
 
-        pyamf.register_alias_type(RepositoryUserClassAlias, database.User)
-
-        MODELS_NAMESPACE = "org.ufsoft.sshg.models"
-
-#        pyamf.register_class(database.User,
-#                             "%s.RepositoryUser" % MODELS_NAMESPACE,
-#                             attrs=['username', 'password', 'added',
-#                                    'last_login', 'is_admin', 'locked_out'])
 
     def setup_translations(self):
         config.locales = {}

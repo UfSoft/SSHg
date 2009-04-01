@@ -31,7 +31,7 @@
       import org.ufsoft.sshg.events.TranslationEvent;
       import org.ufsoft.sshg.events.AuthenticationEvent;
       import org.ufsoft.sshg.components.AuthDialog;
-      //import org.ufsoft.sshg.components.UsersList;
+      import org.ufsoft.sshg.components.UsersList;
 
       private var authDialog    : AuthDialog;
       public var cookie         : SharedObject;
@@ -39,7 +39,7 @@
 
       private var locale        : Locale;
       private var user          : AuthenticatedUser;
-      //private var usersList     : UsersList;
+      private var usersList     : UsersList;
 
       [Event(name="ConnectionLost", type="Event")]
 
@@ -180,8 +180,8 @@
       }
 
       private function showUsersList(event:Event):void {
-        /*usersList = new UsersList();
-        switchContent(usersList);*/
+        usersList = new UsersList();
+        switchContent(usersList);
       }
 
     </mx:Script>

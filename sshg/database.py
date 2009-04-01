@@ -22,12 +22,15 @@ from sqlalchemy import orm
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
 
+from pyamf import amf3, ClassAlias, register_alias_type, register_class
 from sshg import logger
 from sshg.utils.crypto import gen_pwhash, check_pwhash
 
 from twisted.python import log as twlog
 
 log = logger.getLogger(__name__)
+
+SSH_AMF_MODEL_NAMESPACE = "org.ufsoft.sshg.models"
 
 
 def get_engine():
@@ -79,6 +82,7 @@ def require_session(f):
         except:
             twlog.err()
             current_session.rollback()
+            raise   # We need to keep raising the exceptions, for now, all of them
         finally:
             current_session.close()
     return wrapper
@@ -127,6 +131,14 @@ repomanagers_association = db.Table('repositories_managers_association', metadat
 #    db.Column('repo_id', None, db.ForeignKey("repositories.name"))
 #)
 
+#class BaseAmfAlias(ClassAlias):
+#    def createInstance(self, codec=None, *args, **kwargs):
+#        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
+#        return None #, User(args[0], kwargs)
+
+#    def checkClass(self, klass):
+#        print 9876, klass
+#        return
 
 class Repository(DeclarativeBase):
     """Managed Repositories Table"""
@@ -151,6 +163,26 @@ class Repository(DeclarativeBase):
         self.path = repo_path
         self.size = size
         self.quota = quota
+
+
+class RepositoryAmfAlias(ClassAlias):
+
+    def createInstance(self, codec=None, *args, **kwargs):
+        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
+        return None #, User(args[0], kwargs)
+
+    def checkClass(self, klass):
+        print 9876, klass
+        return
+
+#print type(Repository.name)
+#sys.exit()
+register_alias_type(RepositoryAmfAlias, Repository)
+#register_class(Repository,
+#               '.'.join([SSH_AMF_MODEL_NAMESPACE, Repository.__name__]),
+#               attrs=['name', 'path', 'size', 'quota'])
+#                             attrs=['username', 'password', 'added',
+#                                    'last_login', 'is_admin', 'locked_out'])
 
 #class RepoUsers(DeclarativeBase):
 #
@@ -187,6 +219,19 @@ class PublicKey(DeclarativeBase):
 #
 #    user_id = db.Column(db.ForeignKey('repousers.username'))
 
+class PublicKeyAmfAlias(ClassAlias):
+
+    def createInstance(self, codec=None, *args, **kwargs):
+        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
+        return None #, User(args[0], kwargs)
+
+    def checkClass(self, klass):
+        print 9876, klass
+        return
+
+register_alias_type(PublicKeyAmfAlias, PublicKey)
+
+
 class User(DeclarativeBase):
     """Repositories users table"""
     __tablename__ = 'repousers'
@@ -217,11 +262,22 @@ class User(DeclarativeBase):
             self.last_login = datetime.utcnow()
         return valid
 
+class UserAmfAlias(ClassAlias):
+
+    def createInstance(self, codec=None, *args, **kwargs):
+        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
+        return None #, User(args[0], kwargs)
+
+    def checkClass(self, klass):
+        print 9876, klass
+        return
+
+register_alias_type(UserAmfAlias, User)
+
 class Session(DeclarativeBase):
     """Persistent Session Database"""
     __tablename__ = 'persistent_sessions'
 
     uid     = db.Column(db.String, primary_key=True)
     data    = db.Column(db.PickleType)
-
 
