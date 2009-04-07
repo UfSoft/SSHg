@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml"
+                xmlns:controls="org.ufsoft.sshg.controls.*"
+                showCloseButton="true"
+                layout="vertical"
+                styleName="noPadding"
+                close="closeWindow()"
+                title='{resourceManager.getString("sshg", "Edit User")}'
+                creationComplete="creationComplete()"
+                width="90%" height="90%">
+    <mx:Script>
+      import flash.events.Event;
+      import mx.events.ListEvent;
+      import mx.collections.ArrayCollection;
+      import mx.managers.PopUpManager;
+      import flash.display.DisplayObject;
+
+      import mx.rpc.AbstractOperation;
+      import mx.rpc.events.ResultEvent;
+
+      import org.ufsoft.sshg.models.RepositoryUser;
+
+
+      [Bindable]
+      public var user           : Object;
+      [Bindable]
+      private var repositories  : ArrayCollection;
+
+      [Event(name="LoadUserRepositories", type="Event")]
+      [Event(name="LoadedUserRepositories", type="Event")]
+
+      private function creationComplete():void {
+        PopUpManager.centerPopUp(this); // center the popup
+        addEventListener("LoadUserRepositories", loadUserRepositories);
+        //dispatchEvent(new Event("LoadUserRepositories"));
+      }
+
+      private function closeWindow():void {
+        PopUpManager.removePopUp(this);
+      }
+
+      private function loadUserRepositories(event:Event):void {
+        var operation:AbstractOperation = parentApplication.getOperation(
+          'users.get_repositories', updateRepositoriesList);
+        operation.send(user);
+      }
+
+      private function updateRepositoriesList(event:ResultEvent):void {
+        repositories = event.result as ArrayCollection;
+      }
+
+      private function styleFunction(item:Object, rowIndex:int,
+                                     dataIndex:int, color:uint):uint {
+        return color;
+        /*if ( item.is_admin ) {
+          return 0xCCFFCC;
+        }
+        if ( item.locked_out ) {
+          return 0xFFCCCC;
+        }
+        return color;*/
+      }
+
+      private function repositorySelected(event:ListEvent):void {
+        editRepository.enabled = true;
+      }
+    </mx:Script>
+
+    <mx:Form>
+        <mx:FormItem label='{resourceManager.getString("sshg", "Username:")}'>
+            <mx:Text text="{user.username}"/>
+        </mx:FormItem>
+        <mx:FormItem label='{resourceManager.getString("sshg", "Administrator:")}'>
+            <mx:Text text="{user.is_admin}"/>
+        </mx:FormItem>
+        <mx:FormItem label='{resourceManager.getString("sshg", "Locked Out:")}'>
+            <mx:Text text="{user.locked_out}"/>
+        </mx:FormItem>
+        <mx:FormItem label='{resourceManager.getString("sshg", "Added On:")}'>
+            <mx:Text text="{user.added_on}"/>
+        </mx:FormItem>
+        <mx:FormItem label='{resourceManager.getString("sshg", "Last Login:")}'>
+            <mx:Text text="{user.last_login}"/>
+        </mx:FormItem>
+        <controls:RowColorDataGrid id="repositoriesList" rowCount="1" width="100%"
+                                   dataProvider="{repositories}"
+                                   rowColorFunction="styleFunction"
+                                   itemClick="repositorySelected(event)">
+            <controls:columns>
+                <mx:DataGridColumn dataField="name"
+                                   headerText='{resourceManager.getString("sshg", "Name")}'/>
+                <mx:DataGridColumn dataField="path"
+                                   headerText='{resourceManager.getString("sshg", "Path")}'/>
+                <mx:DataGridColumn dataField="size"
+                                   headerText='{resourceManager.getString("sshg", "Size")}'/>
+                <mx:DataGridColumn dataField="quota"
+                                   headerText='{resourceManager.getString("sshg", "Quota")}'/>
+                <mx:DataGridColumn dataField="added"
+                                   headerText='{resourceManager.getString("sshg", "Added On")}'/>
+            </controls:columns>
+        </controls:RowColorDataGrid>
+    </mx:Form>
+
+    <mx:ControlBar>
+        <mx:Spacer width="100%"/>
+        <mx:Button id="updateUser" label='{resourceManager.getString("sshg", "Update User")}'/>
+        <mx:Button id="editRepository" enabled="false"
+                   label='{resourceManager.getString("sshg", "Edit Repository")}'/>
+    </mx:ControlBar>
+</mx:TitleWindow>

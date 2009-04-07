@@ -24,13 +24,15 @@ HDividedBox, VDividedBox, Panel {
   paddingLeft: 5;
 }
 
+TitleWindow { borderAlpha: 0.8; }
+
 Panel {
    roundedBottomCorners: true;
    cornerRadius: 5;
    width: '100%';
    height: '100%';
    titleStyleName: 'panelHeader';
-   borderAlpha: 0.15;
+   borderAlpha: 0.75;
 }
 .noPadding {
   paddingTop: 0;

@@ -189,8 +189,6 @@
         <mx:HBox width="100%">
             <mx:Button id="show_users" click="showUsersList(event)"
                        label='{resourceManager.getString("sshg", "Users")}'/>
-            <mx:Button id="add_user"
-                       label='{resourceManager.getString("sshg", "Add User")}'/>
             <mx:Button id="show_repos"
                        label='{resourceManager.getString("sshg", "Repositories")}'/>
             <mx:Button id="add_repos"

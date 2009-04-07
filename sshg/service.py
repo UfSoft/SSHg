@@ -15,9 +15,10 @@ import sys
 from ConfigParser import SafeConfigParser
 import getpass
 from os import makedirs
-from os.path import abspath, basename, expanduser, isdir, isfile, join
+from os.path import abspath, basename, dirname, expanduser, isdir, isfile, join
 from types import ModuleType
 
+from nevow import appserver
 from twisted.application import internet
 from twisted.application.service import (IServiceMaker, Application,
                                          IServiceCollection)
@@ -34,7 +35,7 @@ from sshg.database import (create_engine, metadata, session, User, PublicKey,
 from sshg.factories import MercurialReposFactory, ConfigurationFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
-
+from sshg.web.site import SSHgWebConfigRoot # After templates are defined
 
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
@@ -239,15 +240,22 @@ class SSHgService(object):
     options = SSHgOptions
 
     def makeService(self, options):
-        application = Application("Mercurial SSH Server") #, uid, gid)
-        services = IServiceCollection(application)
+        app = Application("Mercurial SSH Server") #, uid, gid)
+        services = IServiceCollection(app)
         if options.subCommand == 'server':
             # Run config server too?
-            config_factory = ConfigurationFactory()
-            config_service = internet.SSLServer(config.config_port,
-                                                config_factory,
-                                                config_factory)
-            config_service.setServiceParent(services)
+#            config_factory = ConfigurationFactory()
+#            config_service = internet.SSLServer(config.config_port,
+#                                                config_factory,
+#                                                config_factory)
+#            config_service.setServiceParent(services)
+
+            webconfig = SSHgWebConfigRoot()
+            root = appserver.NevowSite(SSHgWebConfigRoot())
+            webconfig_service = internet.SSLServer(config.config_port,
+                                                   root, webconfig)
+            webconfig_service.setServiceParent(services)
+
         service = options.subOptions.getService()
         service.setServiceParent(services)
         return services

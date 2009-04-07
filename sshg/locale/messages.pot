@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SSHg 0.1\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2009-03-30 16:36+0100\n"
+"POT-Creation-Date: 2009-04-02 17:48+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -26,22 +26,19 @@ msgid "Users"
 msgstr ""
 
 #: flex/src/sshg.mxml:193
-msgid "Add User"
-msgstr ""
-
-#: flex/src/sshg.mxml:195
 msgid "Repositories"
 msgstr ""
 
-#: flex/src/sshg.mxml:197
+#: flex/src/sshg.mxml:195
 msgid "Add Repository"
 msgstr ""
 
-#: flex/src/sshg.mxml:200
+#: flex/src/sshg.mxml:198
 msgid "Logout"
 msgstr ""
 
 #: flex/src/org/ufsoft/sshg/components/AuthDialog.mxml:125
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:64
 msgid "Username:"
 msgstr ""
 
@@ -61,27 +58,77 @@ msgstr ""
 msgid "Authentication Required"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:57
-msgid "Username"
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:67
+msgid "Administrator:"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:59
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:70
+msgid "Locked Out:"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:73
+msgid "Added On:"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:76
+msgid "Last Login:"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:83
+msgid "Name"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:85
+msgid "Path"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:87
+msgid "Size"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:89
+msgid "Quota"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:91
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:74
 msgid "Added On"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:61
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:96
+msgid "Update User"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:98
+msgid "Edit Repository"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/EditUser.mxml:100
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:87
+msgid "Edit User"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:72
+msgid "Username"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:76
 msgid "Last Login"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:63
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:78
 msgid "Is Administrator"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:65
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:80
 msgid "Locked Out"
 msgstr ""
 
-#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:68
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:85
+msgid "Add User"
+msgstr ""
+
+#: flex/src/org/ufsoft/sshg/components/UsersList.mxml:89
 msgid "Users List"
 msgstr ""
 

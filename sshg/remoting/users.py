@@ -14,16 +14,18 @@ from sshg.remoting import *
 from sshg.database import User
 
 log = logger.getLogger(__name__)
-import pyamf
 
 class UsersResource(Resource):
 
     @require_session
     def get_all(self, session=None):
-        klass = pyamf.load_class("org.ufsoft.sshg.models.RepositoryUser").klass
-        users = ArrayCollection()
-        for user in session.query(klass).all():
+        users = []
+        for user in session.query(User).all():
             log.debug(user)
-            users.addItem(user)
-        return session.query(klass).all()
+            data = {}
+            for key in ['username', 'password', 'added_on', 'last_login',
+                        'is_admin', 'locked_out']:
+                data[key] = getattr(user, key)
+            users.append(data)
+        return ArrayCollection(users)
 

@@ -35,11 +35,13 @@ class Authentication(Resource):
         if getattr(request.session, 'authenticated', False):
             return 'Logged In.'
         user = session.query(User).get(user_details.get('username'))
-        log.debug(user)
+        log.debug("User authenticating %s", user)
 
         if not user:
+            log.debug("No user: %s", user)
             raise AuthenticationNeeded
         if not user.authenticate(user_details.get('password')):
+            log.debug(user_details)
             raise AuthenticationNeeded
         request.session.user = user
         request.session.authenticated = True

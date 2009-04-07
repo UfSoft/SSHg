@@ -28,10 +28,10 @@ from pyamf.remoting.gateway.twisted import TwistedGateway
 
 from OpenSSL import SSL
 
-from pyamf import amf3, register_class
+from pyamf import amf3, register_class, register_alias_type
+import pyamf
 
 from sshg import config, logger
-from sshg.database import Repository, User, PublicKey
 from sshg.remoting import services
 from sshg.remoting.auth import AuthenticationNeeded
 
@@ -58,24 +58,7 @@ class ConfigurationFactory(Site):
     def __init__(self, logPath=None, timeout=60*60*12):
         resource = self.build_resources()
         Site.__init__(self, resource, logPath, timeout)
-        self.setup_pyamf()
         self.setup_translations()
-
-    def setup_pyamf(self):
-        # Setup PyAMF
-        # Set this to true so that returned objects and arrays are bindable
-        amf3.use_proxies_default = True
-
-        SSH_AMF_MODEL_NAMESPACE = "org.ufsoft.sshg.models"
-
-        register_class(Repository, '%s.Repository' % SSH_AMF_MODEL_NAMESPACE,
-                       attrs=['name', 'path', 'size', 'quota'])
-        register_class(User, '%s.User' % SSH_AMF_MODEL_NAMESPACE,
-                       attrs=['username', 'password', 'added',
-                              'last_login', 'is_admin', 'locked_out'])
-        register_class(PublicKey, '%s.PublicKey' % SSH_AMF_MODEL_NAMESPACE,
-                       attrs=['key', 'added', 'used_on'])
-
 
     def setup_translations(self):
         config.locales = {}
@@ -99,8 +82,7 @@ class ConfigurationFactory(Site):
                 filename = ''
             root.putChild(filename, File(filepath))
 
-        # Override with the files the user provide from it's dir
-        print 123, config.static_dir
+        # Override with the files the user provide from it's dir7
         if isdir(config.static_dir):
             for filename in listdir(config.static_dir):
                 filepath = join(config.static_dir, filename)
@@ -117,7 +99,12 @@ class ConfigurationFactory(Site):
 
     @expose_request
     def preprocessor(self, request, service_request, *args, **kwargs):
-        log.debug('\n\n\n Preprocess %s %s' % (args, kwargs))
+        if service_request.method in ('login',):
+            user_kw = args[0].copy()
+            user_kw['password'] = '*' * len(user_kw.get('password')) or 1
+            log.debug('Preprocess %s %s\n\n' % (user_kw, kwargs))
+        else:
+            log.debug('Preprocess %s %s\n\n' % (args, kwargs))
         try:
             if not request.session:
                 request.getSession()

@@ -22,15 +22,12 @@ from sqlalchemy import orm
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
 
-from pyamf import amf3, ClassAlias, register_alias_type, register_class
 from sshg import logger
 from sshg.utils.crypto import gen_pwhash, check_pwhash
 
 from twisted.python import log as twlog
 
 log = logger.getLogger(__name__)
-
-SSH_AMF_MODEL_NAMESPACE = "org.ufsoft.sshg.models"
 
 
 def get_engine():
@@ -112,44 +109,16 @@ repomanagers_association = db.Table('repositories_managers_association', metadat
 )
 
 
-#repousers_association = db.Table('repositories_users_association', metadata,
-#    db.Column('user_id', None, db.ForeignKey("repousers.username"), primary_key=True),
-#    db.Column('repo_id', None, db.ForeignKey("repositories.name"), primary_key=True),
-#    db.Column('is_manager', db.Boolean, default=False)
-#)
-#
-#class RepoUser(object):
-#    pass
-#
-#db.mapper(RepoUser, repousers_association, properties=dict(
-#    users = db.relation("User", backref="assoc"),
-#    repos = db.relation("Repository", backref="assoc"),
-#))
-
-#repomanagers_association = db.Table('repo_managers_association', metadata,
-#    db.Column('key_id', None, db.ForeignKey("pubkeys.key")),
-#    db.Column('repo_id', None, db.ForeignKey("repositories.name"))
-#)
-
-#class BaseAmfAlias(ClassAlias):
-#    def createInstance(self, codec=None, *args, **kwargs):
-#        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
-#        return None #, User(args[0], kwargs)
-
-#    def checkClass(self, klass):
-#        print 9876, klass
-#        return
-
 class Repository(DeclarativeBase):
     """Managed Repositories Table"""
 
     __tablename__ = 'repositories'
 
-    name    = db.Column(db.String, primary_key=True)
-    path    = db.Column(db.String, unique=True)
-    size    = db.Column(db.Integer, default=0)
-    quota   = db.Column(db.Integer, default=0)
-    added   = db.Column(db.DateTime, default=datetime.utcnow())
+    name        = db.Column(db.String, primary_key=True)
+    path        = db.Column(db.String, unique=True)
+    size        = db.Column(db.Integer, default=0)
+    quota       = db.Column(db.Integer, default=0)
+    added_on    = db.Column(db.DateTime, default=datetime.utcnow())
 
     # Relationships
 #    keys    = db.relation("PublicKey", secondary=repokeys_association,
@@ -164,25 +133,10 @@ class Repository(DeclarativeBase):
         self.size = size
         self.quota = quota
 
-
-class RepositoryAmfAlias(ClassAlias):
-
-    def createInstance(self, codec=None, *args, **kwargs):
-        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
-        return None #, User(args[0], kwargs)
-
-    def checkClass(self, klass):
-        print 9876, klass
-        return
-
-#print type(Repository.name)
-#sys.exit()
-register_alias_type(RepositoryAmfAlias, Repository)
-#register_class(Repository,
-#               '.'.join([SSH_AMF_MODEL_NAMESPACE, Repository.__name__]),
-#               attrs=['name', 'path', 'size', 'quota'])
-#                             attrs=['username', 'password', 'added',
-#                                    'last_login', 'is_admin', 'locked_out'])
+    def __repr__(self):
+        return \
+        '<Repository Path: "%(path)s"  Size: %(size)s  Quota: %(quota)s>' % \
+        self.__dict__
 
 #class RepoUsers(DeclarativeBase):
 #
@@ -199,10 +153,10 @@ class PublicKey(DeclarativeBase):
 
     __tablename__ = 'pubkeys'
 
-    key     = db.Column(db.String, primary_key=True)
-    added   = db.Column(db.DateTime, default=datetime.utcnow())
-    used_on = db.Column(db.DateTime, default=datetime.utcnow())
-    user_id = db.Column(db.ForeignKey('repousers.username'))
+    key         = db.Column(db.String, primary_key=True)
+    added_on    = db.Column(db.DateTime, default=datetime.utcnow())
+    used_on     = db.Column(db.DateTime, default=datetime.utcnow())
+    user_id     = db.Column(db.ForeignKey('repousers.username'))
 
 #    # Many to Many Relation set elsewere
 #    repositories = None
@@ -213,23 +167,9 @@ class PublicKey(DeclarativeBase):
     def update_stamp(self):
         self.used_on = datetime.utcnow()
 
-#class Managers(DeclarativeBase):
-#    """Administrators Table"""
-#    __tablename__ = 'repo_managers'
-#
-#    user_id = db.Column(db.ForeignKey('repousers.username'))
-
-class PublicKeyAmfAlias(ClassAlias):
-
-    def createInstance(self, codec=None, *args, **kwargs):
-        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
-        return None #, User(args[0], kwargs)
-
-    def checkClass(self, klass):
-        print 9876, klass
-        return
-
-register_alias_type(PublicKeyAmfAlias, PublicKey)
+    def __repr__(self):
+        return '<PublicKey "%s..." from "%(username)s">' % (self.key[5:],
+                                                            self.user.__dict__)
 
 
 class User(DeclarativeBase):
@@ -238,7 +178,7 @@ class User(DeclarativeBase):
 
     username        = db.Column(db.String, primary_key=True)
     password        = db.Column(db.String)
-    added           = db.Column(db.DateTime, default=datetime.utcnow())
+    added_on        = db.Column(db.DateTime, default=datetime.utcnow())
     last_login      = db.Column(db.DateTime, default=datetime.utcnow())
     locked_out      = db.Column(db.Boolean, default=False)
     is_admin        = db.Column(db.Boolean, default=False)
@@ -262,17 +202,11 @@ class User(DeclarativeBase):
             self.last_login = datetime.utcnow()
         return valid
 
-class UserAmfAlias(ClassAlias):
+    def __repr__(self):
+        return \
+        '<User "%(username)s"  Admin: %(is_admin)s  Locked: %(locked_out)s>' % \
+        self.__dict__
 
-    def createInstance(self, codec=None, *args, **kwargs):
-        log.debug("\n\nCODEC: %r; ARGS: %r; KWARGS: %r", codec, args, kwargs)
-        return None #, User(args[0], kwargs)
-
-    def checkClass(self, klass):
-        print 9876, klass
-        return
-
-register_alias_type(UserAmfAlias, User)
 
 class Session(DeclarativeBase):
     """Persistent Session Database"""
