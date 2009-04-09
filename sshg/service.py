@@ -35,7 +35,7 @@ from sshg.database import (create_engine, metadata, session, User, PublicKey,
 from sshg.factories import MercurialReposFactory, ConfigurationFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
-from sshg.web.site import SSHgWebConfigRoot # After templates are defined
+from sshg.web.base import SSHgWebConfigBase
 
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
@@ -250,8 +250,16 @@ class SSHgService(object):
 #                                                config_factory)
 #            config_service.setServiceParent(services)
 
-            webconfig = SSHgWebConfigRoot()
-            root = appserver.NevowSite(SSHgWebConfigRoot())
+            handlers = SSHgWebConfigBase.__subclasses__()[:]
+            children = {}
+            import operator
+            handlers.sort(key=operator.attrgetter('hrefName'), reverse=True)
+            for idx, child in enumerate(handlers):
+                children[child.hrefHdlr] = child()
+
+            webconfig = SSHgWebConfigBase()
+            webconfig.children = children
+            root = appserver.NevowSite(webconfig)
             webconfig_service = internet.SSLServer(config.config_port,
                                                    root, webconfig)
             webconfig_service.setServiceParent(services)

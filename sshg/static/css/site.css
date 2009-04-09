@@ -35,3 +35,8 @@ ul.nav li a, ul.nav li a:visited {
 }
 ul.nav li.active { color: lightgreen; text-decoration: none; }
 ul.nav li a:hover { color: #2c8fc8; text-decoration: none; }
+
+div.contents {
+  margin: 0 auto 0 auto;
+  width: 98%;
+}

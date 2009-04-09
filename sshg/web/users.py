@@ -10,6 +10,25 @@
     :license: BSD, see LICENSE for more details.
 """
 
+from sshg.database import require_session, User
+from sshg.web.base import SSHgWebConfigBase
 
+class SSHgUsers(SSHgWebConfigBase):
 
-from sshg.database import User
+    contentTemplateFile = 'users_list.html'
+
+    hrefHdlr = 'users'
+    hrefName = 'Users'
+
+    @require_session
+    def data_users(self, context, data, session=None):
+        print '\ncalled data_users'
+        return session.query(User).all()
+
+    def render_user(self, context, data):
+        context.tag.fillSlots('username', data.username)
+        context.tag.fillSlots('added_on', str(data.added_on))
+        context.tag.fillSlots('last_login', str(data.last_login))
+        context.tag.fillSlots('locked_out', data.locked_out)
+        context.tag.fillSlots('is_admin', data.is_admin)
+        return context.tag

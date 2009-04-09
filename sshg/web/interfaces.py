@@ -6,13 +6,14 @@
 # License: BSD - Please view the LICENSE file for additional information.
 # ==============================================================================
 
-from sshg.web.base import SSHgWebConfigBase
+from zope.interface import Interface
 
-class SSHgWebConfigRoot(SSHgWebConfigBase):
-    contentTemplateFile = 'index.html'
+class IURLHandler(Interface):
 
-    hrefHdlr = '/'
-    hrefName = 'Home'
+    def getUrlHref(cls):
+        pass
 
+    def getUrlName(cls):
+        pass
 
-
+print 88800000, dir(IURLHandler)

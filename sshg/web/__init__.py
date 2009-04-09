@@ -15,3 +15,5 @@ __license__     = 'BSD'
 __url__         = 'https://hg.ufsoft.org/SSHg'
 __description__ = __doc__
 
+
+import users, site
