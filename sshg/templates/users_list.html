@@ -1,9 +1,11 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"
       xmlns:nevow="http://nevow.com/ns/nevow/0.1">
 <p>Users List</p>
+<form method="post" action="">
 <table>
   <thead>
     <tr>
+      <th class="sel"/>
       <th>Username</th>
       <th>Added On</th>
       <th>Last Login</th>
@@ -13,6 +15,11 @@
   </thead>
   <tbody nevow:render="sequence" nevow:data="users">
     <tr nevow:pattern="item" nevow:render="user">
+      <td class="sel">
+        <input type="checkbox" name="username" value="">
+          <nevow:attr name="value"><nevow:slot name="username"/></nevow:attr>
+        </input>
+      </td>
       <td><nevow:slot name="username"/></td>
       <td><nevow:slot name="added_on"/></td>
       <td><nevow:slot name="last_login"/></td>
@@ -21,5 +28,6 @@
     </tr>
   </tbody>
 </table>
+</form>
 </html>
 

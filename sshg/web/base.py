@@ -12,7 +12,7 @@ from os.path import join, dirname
 
 from OpenSSL import SSL
 from twisted.web import static
-from nevow import loaders, inevow, rend, tags, url
+from nevow import loaders, entities, inevow, rend, tags, url
 from sshg import application, config
 
 application.templates = join(dirname(sshg.__file__), 'templates')
@@ -31,10 +31,13 @@ class SSHgWebConfigBase(rend.Page):
 
     hrefHdlr = None
     hrefName = None
+    title = 'Home'
 
     def render_navigation(self, context, data):
         print 123, url.here.child, url.here.sibling
         request = inevow.IRequest(context)
+        url_ = url.URL.fromContext(context)
+        print 9876, url_
         nav = context.tag.clear()
 
         handlers = SSHgWebConfigBase.__subclasses__()[:]
@@ -53,9 +56,7 @@ class SSHgWebConfigBase(rend.Page):
                         request.path, request.path.lstrip('/').split('/')[0]):
                 nav.children.append(
                     tags.li(_class=klass)[
-                        tags.a(href=url.here.child(instance.hrefHdlr))[
-                            instance.hrefName
-                        ]
+                        tags.a(href=instance.hrefHdlr)[instance.hrefName]
                     ])
             else:
                 if klass:
@@ -65,6 +66,9 @@ class SSHgWebConfigBase(rend.Page):
                 nav.children.append(tags.li(_class=klass)[instance.hrefName])
 
         return nav
+
+    def render_title(self, context, data):
+        return tags.xml("%s &#8212; SSHg" % self.title)
 
     def render_content(self, context, data):
         tag = context.tag.clear()

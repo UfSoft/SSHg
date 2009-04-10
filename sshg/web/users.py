@@ -19,6 +19,7 @@ class SSHgUsers(SSHgWebConfigBase):
 
     hrefHdlr = 'users'
     hrefName = 'Users'
+    title = 'Users List'
 
     @require_session
     def data_users(self, context, data, session=None):

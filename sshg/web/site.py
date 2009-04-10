@@ -12,7 +12,7 @@ class SSHgWebConfigRoot(SSHgWebConfigBase):
     contentTemplateFile = 'index.html'
 
     hrefHdlr = '/'
-    hrefName = 'Home'
+    hrefName = title = 'Home'
 
 
 
