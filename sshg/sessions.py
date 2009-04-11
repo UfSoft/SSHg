@@ -10,10 +10,14 @@
     :license: BSD, see LICENSE for more details.
 """
 
+from twisted.conch.insults.insults import ServerProtocol
+from twisted.conch.manhole_ssh import TerminalSessionTransport, TerminalSession
 from twisted.conch.ssh import session, channel
 from twisted.internet import reactor
+from twisted.python import components
 from zope.interface import implements
 from sshg import logger
+from sshg.terminal import AdminTerminal
 
 log = logger.getLogger(__name__)
 
@@ -32,23 +36,24 @@ class FixedSSHSession(session.SSHSession):
             # Only write if we have a transport set up
             self.client.transport.write(data)
 
-class MercurialSession(object):
-    implements(session.ISession)
+class MercurialSession(TerminalSession):
+    #implements(session.ISession)
 
     hg_process_pid = None
 
-    def __init__(self, avatar):
+    def __init__(self, original, avatar):
         log.debug("Initiated Mercurial Session: %s" % avatar.username)
+        components.Adapter.__init__(self, original)
         self.avatar = avatar
-        self.factory = avatar.factory
+        #self.factory = avatar.factory
 
     def getPty(self, term, windowSize, attrs):
-        print "getPTY"
-        pass
+        log.debug("getPTY")
+        TerminalSession.getPty(self, term, windowSize, attrs)
 
     def windowChanged(self, newWindowSize):
-        print "windowChanged"
-        pass
+        log.debug("windowChanged")
+        TerminalSession.windowChanged(self, newWindowSize)
 
 
     def execCommand(self, protocol, cmd):
@@ -71,7 +76,7 @@ class MercurialSession(object):
             protocol.loseConnection()
             return
 
-        print "Are there any args left?", args
+        log.debug("Are there any args left? %s", args)
 
         repository_path = str(repo.path)
 
@@ -99,7 +104,23 @@ class MercurialSession(object):
         transport.loseConnection()
 
     def getPtyOwnership(self):
-        print "getPtyOwnership"
+        log.debug("getPtyOwnership")
+        TerminalSession.getPtyOwnership(self)
 
     def setModes(self):
-        print "setModes"
+        log.debug("setModes")
+        TerminalSession.setModes(self)
+
+
+class MercurialAdminSession(MercurialSession):
+    width = 80
+    height = 24
+
+    transportFactory = TerminalSessionTransport
+    chainedProtocolFactory = ServerProtocol
+
+
+    def openShell(self, transport):
+        self.transportFactory(transport,
+                              self.chainedProtocolFactory(AdminTerminal),
+                              self.avatar, self.width, self.height)

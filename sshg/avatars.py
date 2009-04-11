@@ -14,6 +14,7 @@ import binascii
 import shutil
 import tempfile
 from os.path import abspath, join
+from twisted.conch.insults import insults
 from twisted.conch.ssh import keys
 from twisted.conch.ssh.session import ISession
 from twisted.conch.ssh.filetransfer import SFTPError, ISFTPServer
@@ -21,12 +22,15 @@ from twisted.conch.unix import UnixConchUser
 from twisted.internet import defer
 from twisted.python import components, log
 
-from sshg.sessions import MercurialSession, FixedSSHSession
+from sshg import logger
+from sshg.sessions import (MercurialSession, MercurialAdminSession,
+                           FixedSSHSession)
 from sshg.sftp import SFTPFileTransfer, FileTransferServer
 from sshg.database import require_session, User, PublicKey
 
 # XXX: Implement username/password authentication too ???
 
+log = logger.getLogger(__name__)
 
 def validPublicKey(public_key_contents):
     try:
@@ -35,10 +39,11 @@ def validPublicKey(public_key_contents):
         return False
     return True
 
-class MercurialUser(UnixConchUser):
+class MercurialUser(UnixConchUser, components.Adapter):
     homeDir = _user = _keys = keys_file_path = None
 
-    def __init__(self, username):
+    def __init__(self, original, username):
+        components.Adapter.__init__(self, original)
         UnixConchUser.__init__(self, username)
         self.username = username
         self.channelLookup.update({'session': FixedSSHSession})
@@ -78,8 +83,8 @@ class MercurialUser(UnixConchUser):
     def getHomeDir(self):
         if not self.homeDir:
             self.homeDir = tempfile.mkdtemp()
-            log.msg('Creating home directory for user "%s": %s' % (
-                    self.username, self.homeDir))
+            log.debug('Creating home directory for user "%s": %s' % (
+                      self.username, self.homeDir))
 
             # Populate keys file with current user's keys
             self.keys_file_path = abspath(join(self.homeDir, "authorized_keys"))
@@ -94,21 +99,21 @@ class MercurialUser(UnixConchUser):
 
     @require_session
     def _logout(self, session=None):
-        log.msg('User "%s" logging out' % self.username)
+        log.debug('User "%s" logging out' % self.username)
         user = session.query(User).get(self.username)
         pkeys = [k.key.strip() for k in user.keys]
 
         if self.homeDir:
-            log.msg("Checking if user updated the public keys file")
+            log.debug("Checking if user updated the public keys file")
             # Perhaps check each file in the user home dir???
             file_keys = []
             lineno = 1
             for line in open(self.keys_file_path):
                 key = line.strip()
                 if not validPublicKey(key):
-                    log.msg("Ignoring line %i. Invalid key" % lineno )
+                    log.debug("Ignoring line %i. Invalid key" % lineno )
                 elif key == user.last_used_key.key:
-                    log.msg("Key on line %i was used to login. "
+                    log.debug("Key on line %i was used to login. "
                             "Skipping." % lineno)
                     if key in pkeys:
                         pkeys.pop(pkeys.index(key))
@@ -134,18 +139,26 @@ class MercurialUser(UnixConchUser):
                         session.delete(dbkey)
 
             session.commit()
-            log.msg("User %s added %s and removed %s keys." % (
+            log.debug("User %s added %s and removed %s keys." % (
                     self.username, added_keys, deleted_keys))
             # Now remove any evidences from the file system
-            log.msg("Removing temporary home dir of user %s" % self.username)
+            log.debug("Removing temporary home dir of user %s" % self.username)
             shutil.rmtree(self.homeDir, True)
         # Remove last used key from user
         user.last_used_key = None
-        log.msg('User "%s" logged out' % self.username)
+        log.debug('User "%s" logged out' % self.username)
 
 
+class MercurialAdmin(MercurialUser):
+
+    def openShell(self, protocol):
+        log.debug("SHELL")
+        serverProtocol = insults.ServerProtocol(insults.TerminalProtocol)
+
+        pass
 
 
 
 components.registerAdapter(MercurialSession, MercurialUser, ISession)
+components.registerAdapter(MercurialAdminSession, MercurialAdmin, ISession)
 components.registerAdapter(SFTPFileTransfer, MercurialUser, ISFTPServer)

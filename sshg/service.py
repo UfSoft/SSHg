@@ -37,6 +37,8 @@ from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
 from sshg.web.base import SSHgWebConfigBase
 
+from OpenSSL import SSL
+
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
 
@@ -260,9 +262,16 @@ class SSHgService(object):
             webconfig = SSHgWebConfigBase()
             webconfig.children = children
             root = appserver.NevowSite(webconfig)
-            webconfig_service = internet.SSLServer(config.config_port,
-                                                   root, webconfig)
-            webconfig_service.setServiceParent(services)
+
+#            def getContext():
+#                ctx = SSL.Context(SSL.SSLv23_METHOD)
+#                ctx.use_certificate_file(config.certificate)
+#                ctx.use_privatekey_file(config.private_key)
+#                return ctx
+#            root.getContext = lambda: getContext()
+#            webconfig_service = internet.SSLServer(config.config_port,
+#                                                   root, root)
+#            webconfig_service.setServiceParent(services)
 
         service = options.subOptions.getService()
         service.setServiceParent(services)

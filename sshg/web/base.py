@@ -34,10 +34,7 @@ class SSHgWebConfigBase(rend.Page):
     title = 'Home'
 
     def render_navigation(self, context, data):
-        print 123, url.here.child, url.here.sibling
         request = inevow.IRequest(context)
-        url_ = url.URL.fromContext(context)
-        print 9876, url_
         nav = context.tag.clear()
 
         handlers = SSHgWebConfigBase.__subclasses__()[:]
@@ -45,7 +42,6 @@ class SSHgWebConfigBase(rend.Page):
 
         for idx, child in enumerate(handlers):
             instance = child()
-            print 123, url.here.child(instance.hrefHdlr), url.here.sibling(instance.hrefHdlr)
             self.children[instance.hrefHdlr] = instance
             if idx == len(handlers)-1:
                 klass = 'first'
@@ -75,15 +71,6 @@ class SSHgWebConfigBase(rend.Page):
         tag[loaders.xmlfile(join(application.templates,
                                  self.contentTemplateFile))]
         return tag
-
-#    def locateChild(self, ctx, segments):
-#        print 9876, ctx, segments
-#        return rend.Page.locateChild(self, ctx, segments)
-#
-#    def childFactory(self, context, segment):
-#        print 11111, context, segment
-#        rend.Page.childFactory(self, context, segment)
-
 
     def getContext(self):
         ctx = SSL.Context(SSL.SSLv23_METHOD)
