@@ -130,7 +130,21 @@ class AdminTerminal(insults.TerminalProtocol):
         self.terminal.eraseDisplay()
         self.terminal.resetPrivateModes([insults.privateModes.CURSOR_MODE])
 
+        from sshg import database as db
+        session = db.session()
+
         self.window = window.TopWindow(self._draw, self._schedule)
+        users = session.query(db.User.username).all()
+        if users:
+            users = [u.encode('utf-8') for u in users[0]]
+        log.debug("Users: %s", users)
+        self.usersList = window.Selection(users, None)
+        hbox = window.HBox()
+        hbox.addChild(window.Border(self.usersList))
+        self.window.addChild(hbox)
+        self.window.addChild(window.Border(window.VBox()))
+        self.terminalSize(self.width, self.height)
+
 
     def keystrokeReceived(self, keyID, modifier):
         log.debug("keystrokeReceived: %s -> %r; Modifier: %s -> %r",

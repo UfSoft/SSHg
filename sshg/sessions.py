@@ -121,6 +121,7 @@ class MercurialAdminSession(MercurialSession):
 
 
     def openShell(self, transport):
+
         self.transportFactory(transport,
                               self.chainedProtocolFactory(AdminTerminal),
                               self.avatar, self.width, self.height)
