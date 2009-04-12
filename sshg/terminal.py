@@ -75,6 +75,9 @@ class BaseAdminTerminal(HistoricRecvLine):
             '\x03': self.handle_CTRL_C,
             '\x04': self.handle_CTRL_D,
         })
+        publicMethods = filter(
+            lambda funcname: funcname.startswith('do_'), dir(self))
+        self.actions = [cmd.replace('do_', '', 1) for cmd in publicMethods]
 
     def terminalSize(self, width, height):
         # XXX - Clear the previous input line, redraw it at the new
@@ -89,8 +92,99 @@ class BaseAdminTerminal(HistoricRecvLine):
     def do_exit(self):
         """Exit admin shell"""
         self.terminal.loseConnection()
-
     handle_CTRL_C = handle_CTRL_D = do_exit
+
+    def getMatchingCommands(self, prefix, command=None):
+        log.debug("MatchingCommands -> Prefix: %r Command: %r", prefix, command)
+        prefix = prefix.strip()
+        if command:
+            return [cmd for cmd in command.commands.keys()
+                    if cmd.startswith(prefix)], [cmd for cmd in command.actions
+                                                 if cmd.startswith(prefix)]
+
+        return [cmd for cmd in self.commands.keys()
+                if cmd.startswith(prefix)], [cmd for cmd in self.actions
+                                             if cmd.startswith(prefix)]
+
+        current = ''.join(self.lineBuffer).split()
+        if self.lineBuffer[-1] == ' ':
+            current.append('')
+        log.debug('Current: %s', current)
+        if len(current)==1:
+            valid_commands = [cmd for cmd in self.commands.keys() +
+                              self.actions if cmd.startswith(current[0])]
+            if len(valid_commands) == 1:
+                extend_buffer = valid_commands[0][len(current[0]):] + ' '
+                self.lineBuffer.extend(extend_buffer)
+                return extend_buffer
+        else:
+            if not current[1].strip():
+                self.nextLine()
+                self.write(' '.join(self.commands[current[0]].actions +
+                                    self.commands[current[0]].commands.keys()))
+                self.nextLine()
+                self.drawInputLine()
+            else:
+                searcher = self.commands[current[0]]
+                valid_commands = [cmd for cmd in searcher.commands.keys()
+                                  if cmd.startswith(current[0])]
+                if len(valid_commands) == 1:
+                    extend_buffer = valid_commands[0][len(current[0]):] + ' '
+                    self.lineBuffer.extend(extend_buffer)
+                    return extend_buffer
+
+    def handle_TAB(self):
+        log.debug("Linebuffer: %s", self.currentLineBuffer())
+        prefix = self.currentLineBuffer()[0]
+        commands, actions = self.getMatchingCommands(prefix)
+        log.debug("Matching: %r %r", commands, actions)
+        if len(actions) > 1 or len(commands) > 1:
+            self.nextLine()
+            if len(actions) > 1:
+                self.write('Commands: %s' % ', '.join(actions))
+            if len(commands) > 1:
+                self.write('Sub-Commands: %s' % ', '.join(commands))
+            self.nextLine()
+            self.drawInputLine()
+        elif len(commands) == 1:
+            command = commands[0]
+            if command in self.commands:
+                log.debug('Matched Command: %s', command)
+                extend_buffer = command[self.lineBufferIndex:]
+                self.lineBuffer.extend(extend_buffer)
+                self.lineBufferIndex = len(self.lineBuffer)
+                self.write(extend_buffer)
+                prefix = prefix[len(command):].lstrip()
+                if not prefix:
+                    subcommands = self.commands[command].commands.keys()
+                    subactions = self.commands[command].actions
+                    if len(subactions) < 1 or len(subcommands) < 1:
+                        self.nextLine()
+                        if len(subactions) > 1:
+                            self.write('Commands: %s' % ', '.join(subactions))
+                        if len(subcommands) > 1:
+                            self.write('Sub-Commands: %s' % ', '.join(subcommands))
+                        self.nextLine()
+                        self.drawInputLine()
+                elif prefix:
+                    log.debug('Sub Buffer: %r', prefix)
+                    subcommands, subactions = self.getMatchingCommands(
+                        prefix, self.commands.get(command, None))
+                    log.debug("1: %r %r", subcommands, subactions)
+                    if len(subactions) < 1 or len(subcommands) < 1:
+                        self.nextLine()
+                        if len(subactions) > 1:
+                            self.write('Commands: %s' % ', '.join(subactions))
+                        if len(subcommands) > 1:
+                            self.write('Sub-Commands: %s' % ', '.join(subcommands))
+                        self.nextLine()
+                        self.drawInputLine()
+        elif len(actions) == 1:
+            extend_buffer = actions[0][self.lineBufferIndex:] + ' '
+            self.lineBuffer.extend(extend_buffer)
+            self.write(extend_buffer)
+#        else:
+#            self.write("No matches found for '%s'" % ''.join(self.lineBuffer))
 
     def getCommandFunc(self, command):
         return getattr(self, 'do_%s' % command, None)
@@ -208,5 +302,7 @@ class AdminTerminal(BaseAdminTerminal):
     def connectionMade(self):
         BaseAdminTerminal.connectionMade(self)
         self.commands = {
-            'users': UserCommands(self)
+            'users': UserCommands(self),
+            'foo': UserCommands(self),
+            'foobar': UserCommands(self)
         }
