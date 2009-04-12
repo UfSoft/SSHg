@@ -6,150 +6,207 @@
 # License: BSD - Please view the LICENSE file for additional information.
 # ==============================================================================
 
-from twisted.internet import reactor, task
-from twisted.conch.insults import insults, window
-
+from twisted.conch.recvline import HistoricRecvLine
 from sshg import logger
 
 log = logger.getLogger(__name__)
 
-class DemoTerminal(insults.TerminalProtocol):
-    width = 80
-    height = 24
 
-    def _draw(self):
-        self.window.draw(self.width, self.height, self.terminal)
+GREEN = '\x1b[32m'
+LIGHT_GREEN = '\x1b[1;32m'
+RED = '\x1b[31m'
+LIGHT_RED = '\x1b[1;31m'
+ORANGE = '\x1b[33m'
+YELLOW = '\x1b[1;33m'
+NORMAL_COLOR = '\x1b[0m'
 
-    def _redraw(self):
-        self.window.filthy()
-        self._draw()
+COLORS = {
+    'green': GREEN,
+    'light-green': LIGHT_GREEN,
+    'red': RED,
+    'light-red': LIGHT_RED,
+    'orange': ORANGE,
+    'yellow': YELLOW,
+    'reset': NORMAL_COLOR
+}
 
-    def _schedule(self, f):
-        reactor.callLater(0, f)
+from twisted.internet import defer
+
+
+class BaseAdminTerminal(HistoricRecvLine):
+
+    ps = '%(light-red)s[SSHg Admin]:%(reset)s ' % COLORS
+    psc = '%(light-red)s[SSHg Admin %(light-green)s%%s%(light-red)s]:%(reset)s ' % COLORS
+    command = name = terminal = None
+    commands = {}
+
+    def __init__(self, parent=None):
+        if parent:
+            self.terminal = parent.terminal
+            self.connectionMade()
+        for command, instance in self.commands.iteritems():
+            self.commands[command] = instance(self)
+
+    def motd(self):
+        self.terminal.write(
+            "%(green)s  Welcome to the SSHg console terminal. "
+            "Type ? for help." % COLORS)
+        self.nextLine()
+
+    def nextLine(self):
+        self.terminal.write(NORMAL_COLOR)
+        self.terminal.nextLine()
+
+    def initializeScreen(self):
+        self.terminal.reset()
+        self.motd()
+        self.nextLine()
+        self.terminal.write(self.ps)
+        self.setInsertMode()
+
+    def makeConnection(self, terminal):
+        if self.terminal is None:
+            self.terminal = terminal
+        self.connectionMade()
 
     def connectionMade(self):
-        self.terminal.eraseDisplay()
-        self.terminal.resetPrivateModes([insults.privateModes.CURSOR_MODE])
-
-        self.window = window.TopWindow(self._draw, self._schedule)
-        self.output = window.TextOutput((15, 1))
-        self.input = window.TextInput(15, self._setText)
-        self.select1 = window.Selection(map(str, range(100)), self._setText, 10)
-        self.select2 = window.Selection(map(str, range(200, 300)), self._setText, 10)
-        self.button = window.Button("Clear", self._clear)
-        #self.canvas = DrawableCanvas()
-
-        hbox = window.HBox()
-        hbox.addChild(self.input)
-        hbox.addChild(self.output)
-        hbox.addChild(window.Border(self.button))
-        hbox.addChild(window.Border(self.select1))
-        hbox.addChild(window.Border(self.select2))
-
-        t1 = window.TextOutputArea(longLines=window.TextOutputArea.WRAP)
-        t2 = window.TextOutputArea(longLines=window.TextOutputArea.TRUNCATE)
-        t3 = window.TextOutputArea(longLines=window.TextOutputArea.TRUNCATE)
-        t4 = window.TextOutputArea(longLines=window.TextOutputArea.TRUNCATE)
-        for _t in t1, t2, t3, t4:
-            _t.setText((('This is a very long string.  ' * 3) + '\n') * 3)
-
-        vp = window.Viewport(t3)
-        d = [1]
-        def spin():
-            vp.xOffset += d[0]
-            if vp.xOffset == 0 or vp.xOffset == 25:
-                d[0] *= -1
-        self.call = task.LoopingCall(spin)
-        self.call.start(0.25, now=False)
-        hbox.addChild(window.Border(vp))
-
-        vp2 = window.ScrolledArea(t4)
-        hbox.addChild(vp2)
-
-        texts = window.VBox()
-        texts.addChild(window.Border(t1))
-        texts.addChild(window.Border(t2))
-
-        areas = window.HBox()
-        #areas.addChild(window.Border(self.canvas))
-        areas.addChild(texts)
-
-        vbox = window.VBox()
-        vbox.addChild(hbox)
-        vbox.addChild(areas)
-        self.window.addChild(vbox)
-        self.terminalSize(self.width, self.height)
-
-    def connectionLost(self, reason):
-        self.call.stop()
-        insults.TerminalProtocol.connectionLost(self, reason)
+        HistoricRecvLine.connectionMade(self)
+        self.keyHandlers.update({
+            '\x03': self.handle_CTRL_C,
+            '\x04': self.handle_CTRL_D,
+        })
 
     def terminalSize(self, width, height):
+        # XXX - Clear the previous input line, redraw it at the new
+        # cursor position
+        self.terminal.eraseDisplay()
+        self.terminal.cursorHome()
         self.width = width
         self.height = height
-        self.terminal.eraseDisplay()
-        self._redraw()
+        self.motd()
+        self.drawInputLine()
 
+    def do_exit(self):
+        """Exit admin shell"""
+        self.terminal.loseConnection()
+
+    handle_CTRL_C = handle_CTRL_D = do_exit
+
+    def getCommandFunc(self, command):
+        return getattr(self, 'do_%s' % command, None)
+
+    def switchToCommand(self, cmd):
+        if cmd:
+            self.command = self.commands[cmd]
+            self.write("Issue the '..' command to go back")
+            self.nextLine()
+        else:
+            self.command = cmd
+        self.drawInputLine()
+
+    def lineReceived(self, line):
+        line = line.strip()
+        if line:
+            cmd_and_args = line.split()
+            cmd = cmd_and_args[0]
+            if cmd == '..':
+                self.switchToCommand(None)
+                return
+            elif cmd == '?':
+                cmd = 'help'
+            args = cmd_and_args[1:]
+            if self.command:
+                runner = self.command
+            else:
+                runner = self
+            if cmd in runner.commands:
+                if not args:
+                    self.switchToCommand(cmd)
+                else:
+                    runner.commands[cmd].lineReceived(' '.join(args))
+                return
+            func = runner.getCommandFunc(cmd)
+            if callable(func):
+                try:
+                    self.write(defer.maybeDeferred(func, *args))
+                except Exception, err:
+                    self.write('Error: %s' % err)
+            else:
+                self.write("No such command: '%s'" % cmd)
+        self.nextLine()
+        self.drawInputLine()
+
+    def do_help(self, cmd='', format=None):
+        "Get help on a command. Usage: help command"
+        if cmd:
+            func = self.getCommandFunc(cmd)
+            if func:
+                cmd_line = " %%(green)s%s%%(reset)s: %s" % (cmd, func.__doc__)
+                if format:
+                    cmd_line = format % (cmd, func.__doc__)
+                self.terminal.write(cmd_line % COLORS)
+                self.terminal.nextLine()
+                return
+
+        publicMethods = filter(
+            lambda funcname: funcname.startswith('do_'), dir(self))
+        commands = [cmd.replace('do_', '', 1) for cmd in publicMethods]
+        self.terminal.write("%(yellow)sCommands:" % COLORS)
+        self.nextLine()
+        longest = max([len(command) for command in commands])
+        log.debug(publicMethods)
+        format = '%(light-green)s%%%%+%%ds%(reset)s: %%%%s' % COLORS
+        log.debug(repr(format))
+        for command in sorted(commands):
+            self.do_help(command, format % (longest+1))
+        subcommands = self.commands.keys()
+        if subcommands:
+            self.terminal.write("%(yellow)sSub-Commands:" % COLORS)
+            self.nextLine()
+            longest = max([len(command) for command in subcommands])
+            self.terminal.write(format % (longest+2) %
+                                (command, self.commands[command].__doc__))
+
+    def drawInputLine(self):
+        if self.command:
+            self.terminal.write(self.psc % self.command.name +
+                                ''.join(self.lineBuffer))
+        else:
+            self.terminal.write(self.ps + ''.join(self.lineBuffer))
 
     def keystrokeReceived(self, keyID, modifier):
-        self.window.keystrokeReceived(keyID, modifier)
+        m = self.keyHandlers.get(keyID)
+        if m is not None:
+            m()
+        else:
+            self.characterReceived(keyID, False)
 
-    def _clear(self):
-        pass
-        #self.canvas.clear()
+    def write(self, line):
+        if isinstance(line, defer.Deferred):
+            line.addCallback(self.write)
+        else:
+            self.terminal.write(line)
 
-    def _setText(self, text):
-        self.input.setText('')
-        self.output.setText(text)
+class UserCommands(BaseAdminTerminal):
+    """User Commands"""
 
+    name = 'users'
 
-class AdminTerminal(insults.TerminalProtocol):
-    width = 80
-    height = 24
-
-    def _draw(self):
-        self.window.draw(self.width, self.height, self.terminal)
-
-    def _schedule(self, f):
-        reactor.callLater(0, f)
-
-    def _redraw(self):
-        self.window.filthy()
-        self._draw()
-
-    def connectionLost(self, reason):
-        insults.TerminalProtocol.connectionLost(self, reason)
-
-    def terminalSize(self, width, height):
-        self.width = width
-        self.height = height
-        self.terminal.eraseDisplay()
-        self._redraw()
-
-    def connectionMade(self):
-        self.terminal.eraseDisplay()
-        self.terminal.resetPrivateModes([insults.privateModes.CURSOR_MODE])
-
+    def do_list(self):
+        """List Available Users"""
+        self.terminal.write('Available Users:')
+        self.nextLine()
         from sshg import database as db
         session = db.session()
+        for username in session.query(db.User.username).all():
+            log.debug(username)
+            self.terminal.write('  ' + username[0].encode('utf-8'))
+            self.terminal.nextLine()
 
-        self.window = window.TopWindow(self._draw, self._schedule)
-        users = session.query(db.User.username).all()
-        if users:
-            users = [u.encode('utf-8') for u in users[0]]
-        log.debug("Users: %s", users)
-        self.usersList = window.Selection(users, None)
-        hbox = window.HBox()
-        hbox.addChild(window.Border(self.usersList))
-        self.window.addChild(hbox)
-        self.window.addChild(window.Border(window.VBox()))
-        self.terminalSize(self.width, self.height)
+class AdminTerminal(BaseAdminTerminal):
 
-
-    def keystrokeReceived(self, keyID, modifier):
-        log.debug("keystrokeReceived: %s -> %r; Modifier: %s -> %r",
-                  keyID, keyID, modifier, modifier)
-        if keyID in ('\x03', '\x04'):
-            self.terminal.loseConnection()
-        else:
-            self.window.keystrokeReceived(keyID, modifier)
+    def connectionMade(self):
+        BaseAdminTerminal.connectionMade(self)
+        self.commands = {
+            'users': UserCommands(self)
+        }
