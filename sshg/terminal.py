@@ -135,56 +135,54 @@ class BaseAdminTerminal(HistoricRecvLine):
 
     def handle_TAB(self):
         log.debug("Linebuffer: %s", self.currentLineBuffer())
-        prefix = self.currentLineBuffer()[0]
-        commands, actions = self.getMatchingCommands(prefix)
-        log.debug("Matching: %r %r", commands, actions)
-        if len(actions) > 1 or len(commands) > 1:
-            self.nextLine()
-            if len(actions) > 1:
-                self.write('Commands: %s' % ', '.join(actions))
-            if len(commands) > 1:
-                self.write('Sub-Commands: %s' % ', '.join(commands))
-            self.nextLine()
-            self.drawInputLine()
-        elif len(commands) == 1:
-            command = commands[0]
-            if command in self.commands:
-                log.debug('Matched Command: %s', command)
-                extend_buffer = command[self.lineBufferIndex:]
+        buff = self.currentLineBuffer()[0].split()
+        command = None
+        action = None
+        while buff:
+            prefix = buff.pop(0)
+            log.debug('Current Prefix: %r', prefix)
+            commands, actions = self.getMatchingCommands(prefix, command)
+            log.debug("Matching: %r %r", commands, actions)
+            if len(actions) > 1 or len(commands) > 1:
+                self.nextLine()
+                self.write(' '.join(actions + commands))
+                self.nextLine()
+                self.drawInputLine()
+            elif len(commands) == 1:
+                if commands[0] in self.commands:
+                    log.debug('Matched Command: %s', commands[0])
+                    extend_buffer = commands[0][len(prefix):]
+                    self.lineBuffer.extend(extend_buffer)
+                    self.lineBufferIndex = len(self.lineBuffer)
+                    self.write(extend_buffer)
+                    command = self.commands[commands[0]]
+                    continue
+            elif len(actions) == 1:
+                log.debug('Matched Action: %s', actions[0])
+                extend_buffer = actions[0][len(prefix):]
                 self.lineBuffer.extend(extend_buffer)
                 self.lineBufferIndex = len(self.lineBuffer)
                 self.write(extend_buffer)
-                prefix = prefix[len(command):].lstrip()
-                if not prefix:
-                    subcommands = self.commands[command].commands.keys()
-                    subactions = self.commands[command].actions
-                    if len(subactions) < 1 or len(subcommands) < 1:
-                        self.nextLine()
-                        if len(subactions) > 1:
-                            self.write('Commands: %s' % ', '.join(subactions))
-                        if len(subcommands) > 1:
-                            self.write('Sub-Commands: %s' % ', '.join(subcommands))
-                        self.nextLine()
-                        self.drawInputLine()
-                elif prefix:
-                    log.debug('Sub Buffer: %r', prefix)
-                    subcommands, subactions = self.getMatchingCommands(
-                        prefix, self.commands.get(command, None))
-                    log.debug("1: %r %r", subcommands, subactions)
-                    if len(subactions) < 1 or len(subcommands) < 1:
-                        self.nextLine()
-                        if len(subactions) > 1:
-                            self.write('Commands: %s' % ', '.join(subactions))
-                        if len(subcommands) > 1:
-                            self.write('Sub-Commands: %s' % ', '.join(subcommands))
-                        self.nextLine()
-                        self.drawInputLine()
-        elif len(actions) == 1:
-            extend_buffer = actions[0][self.lineBufferIndex:] + ' '
-            self.lineBuffer.extend(extend_buffer)
-            self.write(extend_buffer)
-#        else:
-#            self.write("No matches found for '%s'" % ''.join(self.lineBuffer))
+                runner = command or self
+                action = actions[0]
+                continue
+        else:
+            log.debug('No more line buffer')
+            if action:
+                runner = command or self
+                func = getattr(runner, 'do_%s' % action)
+                log.debug('Func: %s', func)
+                args = getattr(action, '__args__', '')
+                self.nextLine()
+                self.write('Usage: %s %s %s' % (command.name, action, args))
+                self.nextLine()
+                self.drawInputLine()
+            elif not action:
+                runner = command or self
+                self.nextLine()
+                self.write(' '.join(runner.commands.keys() + runner.actions))
+                self.nextLine()
+                self.drawInputLine()
 
     def getCommandFunc(self, command):
         return getattr(self, 'do_%s' % command, None)
@@ -296,6 +294,8 @@ class UserCommands(BaseAdminTerminal):
             log.debug(username)
             self.terminal.write('  ' + username[0].encode('utf-8'))
             self.terminal.nextLine()
+
+    do_lost = do_list
 
 class AdminTerminal(BaseAdminTerminal):
 
