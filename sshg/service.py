@@ -15,10 +15,9 @@ import sys
 from ConfigParser import SafeConfigParser
 import getpass
 from os import makedirs
-from os.path import abspath, basename, dirname, expanduser, isdir, isfile, join
+from os.path import abspath, basename, expanduser, isdir, isfile, join
 from types import ModuleType
 
-from nevow import appserver
 from twisted.application import internet
 from twisted.application.service import (IServiceMaker, Application,
                                          IServiceCollection)
@@ -26,18 +25,12 @@ from twisted.plugin import IPlugin
 from twisted.python import usage
 from zope.interface import implements
 
-from pyamf import register_class
-
 from sshg import __version__, __summary__, application, config
 from sshg.checkers import MercurialPublicKeysDB
-from sshg.database import (create_engine, metadata, session, User, PublicKey,
-                           Repository)
-from sshg.factories import MercurialReposFactory, ConfigurationFactory
+from sshg.database import create_engine, metadata, session, User, PublicKey
+from sshg.factories import MercurialReposFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
-from sshg.web.base import SSHgWebConfigBase
-
-from OpenSSL import SSL
 
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
@@ -244,35 +237,6 @@ class SSHgService(object):
     def makeService(self, options):
         app = Application("Mercurial SSH Server") #, uid, gid)
         services = IServiceCollection(app)
-        if options.subCommand == 'server':
-            # Run config server too?
-#            config_factory = ConfigurationFactory()
-#            config_service = internet.SSLServer(config.config_port,
-#                                                config_factory,
-#                                                config_factory)
-#            config_service.setServiceParent(services)
-
-            handlers = SSHgWebConfigBase.__subclasses__()[:]
-            children = {}
-            import operator
-            handlers.sort(key=operator.attrgetter('hrefName'), reverse=True)
-            for idx, child in enumerate(handlers):
-                children[child.hrefHdlr] = child()
-
-            webconfig = SSHgWebConfigBase()
-            webconfig.children = children
-            root = appserver.NevowSite(webconfig)
-
-#            def getContext():
-#                ctx = SSL.Context(SSL.SSLv23_METHOD)
-#                ctx.use_certificate_file(config.certificate)
-#                ctx.use_privatekey_file(config.private_key)
-#                return ctx
-#            root.getContext = lambda: getContext()
-#            webconfig_service = internet.SSLServer(config.config_port,
-#                                                   root, root)
-#            webconfig_service.setServiceParent(services)
-
         service = options.subOptions.getService()
         service.setServiceParent(services)
         return services
