@@ -8,7 +8,7 @@
 
 from inspect import getargspec
 from twisted.conch.recvline import HistoricRecvLine
-from sshg import logger
+from sshg import logger, database as db
 
 log = logger.getLogger(__name__)
 
@@ -43,14 +43,6 @@ class BaseAdminTerminal(HistoricRecvLine):
     command = parent = name = terminal = None
     commands = {}
 
-    def __init__(self, parent=None):
-        if parent:
-            self.parent = parent
-            self.terminal = parent.terminal
-            self.connectionMade()
-        for command, instance in self.commands.iteritems():
-            self.commands[command] = instance(self)
-
     def motd(self):
         self.terminal.write(
             "%(green)s  Welcome to the SSHg console terminal. "
@@ -72,6 +64,10 @@ class BaseAdminTerminal(HistoricRecvLine):
         if self.terminal is None:
             self.terminal = terminal
         self.connectionMade()
+        for instance in self.commands.itervalues():
+            log.debug(instance)
+            instance.makeConnection(terminal)
+            instance.connectionMade()
 
     def connectionMade(self):
         HistoricRecvLine.connectionMade(self)
@@ -137,10 +133,32 @@ class BaseAdminTerminal(HistoricRecvLine):
                     self.lineBuffer.extend(extend_buffer)
                     return extend_buffer
 
+    def getFuncUsage(self, func, command, action):
+        log.debug('Func: %s', func)
+        log.debug('ArgSpec: %s', getargspec(func))
+
+        argspec = getargspec(func)
+        names = argspec[0]
+        names.pop(0)
+        defaults = argspec[-1]
+        if defaults:
+            log.debug("Got Defaults, separating args from kwargs")
+            args, kwargs = names[:-len(defaults)], names[-len(defaults):]
+        else:
+            args, kwargs = names, ()
+        log.debug('Args: %r KWArgs: %r Defaults len: %d', args, kwargs,
+                  len(defaults or ()))
+        usage = ' %%(green)sUsage%%(reset)s: %s %s %%(hilight)s%s %s' %(
+            command, action,
+            ' '.join(["<%s>" % a for a in args]),
+            ' '.join(["[%s]" % k for k in kwargs])
+        )
+        return usage % COLORS
+
     def handle_TAB(self):
         log.debug("Linebuffer: %s", self.currentLineBuffer())
         buff = self.currentLineBuffer()[0].split()
-        command = None
+        command = self.command
         action = None
         while buff:
             prefix = buff.pop(0)
@@ -174,36 +192,27 @@ class BaseAdminTerminal(HistoricRecvLine):
         else:
             log.debug('No more line buffer')
             if action:
-                runner = command or self
+                runner = command or self.command or self
+                if action == 'help':
+                    log.debug('On help returning available actions for %r',
+                              runner.__class__)
+                    output = ' '.join(runner.commands.keys() + runner.actions)
+                    self.nextLine()
+                    self.write("%%(hilight)s%s%%(reset)s" % output % COLORS)
+                    self.nextLine()
+                    self.drawInputLine()
+                    return
                 func = getattr(runner, 'do_%s' % action)
-                log.debug('Func: %s', func)
-                log.debug('ArgSpec: %s', getargspec(func))
-
-                argspec = getargspec(func)
-                names = argspec[0]
-                names.pop(0)
-                defaults = argspec[-1]
-                if defaults:
-                    args, kwargs = names[:len(defaults)], names[len(defaults):]
-                else:
-                    args, kwargs = names, ()
-                log.debug('Args: %r KWArgs: %r', args, kwargs)
-#                self.nextLine()
-                usage = ' %%(green)sUsage%%(reset)s: %s %s %%(hilight)s%s %s' % (
-                    runner.name, action,
-                    ' '.join(["<%s>" % a for a in args]),
-                    ' '.join(["[%s]" % k for k in kwargs])
-                )
+                usage = self.getFuncUsage(func, runner.name, action)
                 self.nextLine()
-                self.write(usage % COLORS)
+                self.write(usage)
                 self.nextLine()
                 self.drawInputLine()
             elif not action:
                 runner = command or self
                 self.nextLine()
-                self.write("%%(hilight)s%s%%(reset)s" %
-                           ' '.join(runner.commands.keys() + runner.actions) %
-                           COLORS)
+                output = ' '.join(runner.commands.keys() + runner.actions)
+                self.write("%%(hilight)s%s%%(reset)s" % output % COLORS)
                 self.nextLine()
                 self.drawInputLine()
 
@@ -221,6 +230,7 @@ class BaseAdminTerminal(HistoricRecvLine):
 
     def lineReceived(self, line):
         line = line.strip()
+        log.debug("Received line on %s: %r", self.__class__.__name__, line)
         if line:
             cmd_and_args = line.split()
             cmd = cmd_and_args[0]
@@ -238,20 +248,22 @@ class BaseAdminTerminal(HistoricRecvLine):
                 if not args:
                     self.switchToCommand(cmd)
                 else:
+                    log.debug("Passing arguments to child command '%s': %r",
+                              cmd, args)
                     runner.commands[cmd].lineReceived(' '.join(args))
                 return
             func = runner.getCommandFunc(cmd)
+            log.debug("Discovered function: %s", func)
             if callable(func):
                 def error(exception):
+                    log.debug("Exception catched: %s", exception)
                     if exception.type is TypeError:
                         self.write('not enough arguments passed')
+                    else:
+                        self.write('command failed to execute')
                 d = defer.maybeDeferred(func, *args)
                 d.addCallback(self.write)
                 d.addErrback(error)
-#                try:
-#                    self.write(defer.maybeDeferred(func, *args))
-#                except Exception, err:
-#                    self.write('Error: %s' % err)
             else:
                 self.write("No such command: '%s'" %
                            ' '.join(filter(None, [self.name, line])))
@@ -262,55 +274,40 @@ class BaseAdminTerminal(HistoricRecvLine):
         "Get help on a command. Usage: help command"
         if cmd:
             func = self.getCommandFunc(cmd)
+            if not func:
+                func = self.commands.get(cmd, None)
             if func:
                 if extended:
                     cmd_line = func.__doc__
                 else:
-                    cmd_line = " %%(light-green)s%s%%(reset)s: %s" % (cmd,
-                                                                      func.__doc__)
-#                cmd_line = func.__doc__
+                    cmd_line = " %%(light-green)s%s%%(reset)s: %s" % (
+                                                            cmd, func.__doc__)
                     if format:
                         cmd_line = format % (cmd, func.__doc__)
                 self.terminal.write(cmd_line % COLORS)
                 self.nextLine()
                 if extended:
-                    argspec = getargspec(func)
-                    names = argspec[0]
-                    names.pop(0)
-                    defaults = argspec[-1]
-                    if defaults:
-                        args, kwargs = names[:len(defaults)], names[len(defaults):]
-                    else:
-                        args, kwargs = names, ()
-                    log.debug('Args: %r KWArgs: %r', args, kwargs)
-                    self.nextLine()
-                    usage = ' %%(green)sUsage%%(reset)s: %s %s %%(hilight)s%s %s' % (
-                        self.name, cmd,
-                        ' '.join(["<%s>" % a for a in args]),
-                        ' '.join(["[%s]" % k for k in kwargs])
-                    )
-                    self.write(usage % COLORS)
+                    usage = self.getFuncUsage(func, self.name, cmd)
+                    self.write(usage)
                     self.nextLine()
                 return
 
-        publicMethods = filter(
-            lambda funcname: funcname.startswith('do_'), dir(self))
-        commands = [cmd.replace('do_', '', 1) for cmd in publicMethods]
-        self.terminal.write("%(yellow)sCommands:" % COLORS)
-        self.nextLine()
-        longest = max([len(command) for command in commands])
-        log.debug(publicMethods)
-        format = '%(light-green)s%%%%+%%ds%(reset)s: %%%%s' % COLORS
-        log.debug(repr(format))
-        for command in sorted(commands):
-            self.do_help(command, format % (longest+1), extended=False)
+        if self.actions:
+            self.terminal.write("%(yellow)sCommands:" % COLORS)
+            self.nextLine()
+            longest = max([len(command) for command in self.actions])
+            format = '%(light-green)s%%%%+%%ds%(reset)s: %%%%s' % COLORS
+            for command in sorted(self.actions):
+                self.do_help(command, format % (longest+1), extended=False)
+
         subcommands = self.commands.keys()
         if subcommands:
+            log.debug("SubCommands: %r", subcommands)
             self.terminal.write("%(yellow)sSub-Commands:" % COLORS)
             self.nextLine()
             longest = max([len(command) for command in subcommands])
-            self.terminal.write(format % (longest+2) %
-                                (command, self.commands[command].__doc__))
+            for command in subcommands:
+                self.do_help(command, format % (longest+2), extended=False)
 
     def drawInputLine(self):
         if self.command:
@@ -341,25 +338,52 @@ class UserCommands(BaseAdminTerminal):
         """List Available Users"""
         self.terminal.write('Available Users:')
         self.nextLine()
-        from sshg import database as db
         session = db.session()
         for username in session.query(db.User.username).all():
             log.debug(username)
             self.terminal.write('  ' + username[0].encode('utf-8'))
             self.terminal.nextLine()
 
-    def do_lost(self, foo, bar=''):
-        """foo bar example"""
+    def do_add(self, username, password, is_admin=False):
+        """Add a new user"""
+        session = db.session()
+        user = db.User(username, password, bool(is_admin))
+        session.add(user)
+        session.commit()
+        self.write("User %s added" % username)
+
+    def do_details(self, username):
+        """Show user details"""
+        session = db.session()
+        user = session.query(db.User).get(username)
+        if not user:
+            self.write("User '%s' is not known" % username)
+            self.nextLine()
+            self.drawInputLine()
+            return
+        w = lambda txt: (self.write(txt % COLORS), self.nextLine())
+        w("%%(hilight)s   Username%%(reset)s: %s" %
+          user.username.encode('utf-8'))
+        w("%%(hilight)s   Added On%%(reset)s: %s" % user.added_on)
+        w("%%(hilight)s Last Login%%(reset)s: %s" % user.last_login)
+        w("%%(hilight)s Locked Out%%(reset)s: %s" % user.locked_out)
+        w("%%(hilight)s   Is Admin%%(reset)s: %s" % user.is_admin)
+
+    def do_delete(self, username):
+        """Remove a user from database"""
+        session = db.session()
+        user = session.query(db.User).get(username)
+        if not user:
+            self.write("User '%s' is not known" % username)
+            return
+        session.delete(user)
+        session.commit()
+        self.write("User %s deleted" % username)
 
 class AdminTerminal(BaseAdminTerminal):
-
-    def connectionMade(self):
-        BaseAdminTerminal.connectionMade(self)
-        self.commands = {
-            'users': UserCommands(self),
-            'foo': UserCommands(self),
-            'foobar': UserCommands(self)
-        }
+    commands = {
+        'users': UserCommands()
+    }
 
     def do_exit(self):
         """Exit admin shell"""
