@@ -141,25 +141,15 @@ class BaseAdminTerminal(HistoricRecvLine):
         argspec = getargspec(func)
         names = argspec[0]
         names.pop(0)
-        defaults = argspec[-1]
-        if defaults:
-            log.debug("Got Defaults, separating args from kwargs")
-            args, kwargs = names[:-len(defaults)], names[-len(defaults):]
-        else:
-            args, kwargs = names, ()
+        defaults = argspec[-1] or ()
+        log.debug("Separating args from kwargs")
+        args, kwargs = names[:-len(defaults)], names[-len(defaults):]
         log.debug('Args: %r KWArgs: %r Defaults len: %d', args, kwargs,
-                  len(defaults or ()))
-        if command:
-            usage = ' %%(green)sUsage%%(reset)s: %s %s %%(hilight)s%s %s' %(
-                command or '', action,
-                ' '.join(["<%s>" % a for a in args]),
-                ' '.join(["[%s]" % k for k in kwargs])
-            )
-        else:
-            usage = ' %%(green)sUsage%%(reset)s: %s %%(hilight)s%s %s' %(
-                action, ' '.join(["<%s>" % a for a in args]),
-            ' '.join(["[%s]" % k for k in kwargs])
-            )
+                  len(defaults))
+        usage = ' %%(green)sUsage%%(reset)s: %s %%(hilight)s%s' %(
+            ' '.join(filter(None, [command, action])),
+            ' '.join(["<%s>" % a for a in args] + ["[%s]" % k for k in kwargs])
+        )
         return usage % COLORS
 
     def handle_TAB(self):
