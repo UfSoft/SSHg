@@ -8,7 +8,7 @@
 
 from inspect import getargspec
 from twisted.conch.recvline import HistoricRecvLine
-from sshg import logger, database as db
+from sshg import logger, database as db, config
 
 log = logger.getLogger(__name__)
 
@@ -44,13 +44,11 @@ class BaseAdminTerminal(HistoricRecvLine):
     commands = {}
 
     def __init__(self, avatar=None):
-        self.avatar = avatar
         HistoricRecvLine.__init__(self)
+        self.avatar = avatar
 
     def motd(self):
-        self.terminal.write(
-            "%(green)s  Welcome to the SSHg console terminal. "
-            "Type ? for help." % COLORS)
+        self.terminal.write(config.motd % COLORS)
         self.nextLine()
 
     def nextLine(self):

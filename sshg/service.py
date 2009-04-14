@@ -87,22 +87,8 @@ class SetupOptions(BaseOptions):
                                                     *encryption_args)
             open(config.private_key, 'w').write(privateKeyData)
 
-            print "Generating configuration server SSL certificate"
-            cert = crypto.X509()
-            subject = cert.get_subject()
-            subject.CN = 'SSHg Configuration Server'
-            #cert.set_subject(subject)
-            cert.set_pubkey(privateKey)
-            cert.set_serial_number(0)
-            cert.gmtime_adj_notBefore(0)
-            cert.gmtime_adj_notAfter(60 * 60 * 24 * 365 * 5) # Five Years
-            cert.set_issuer(subject)
-            cert.sign(privateKey, "md5")
-            certData = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
-            open(config.certificate, 'w').write(certData)
-            print "Done. This certificate is valid for 5 years."
-            print "You can provide your own private key/certificate,"
-            print "just point to the correct paths on the configuration file."
+            print "You can provide your own private key."
+            print "Just point to the correct paths on the configuration file."
 
 
         print "Creating Database"
@@ -176,11 +162,15 @@ class SSHgOptions(BaseOptions):
             print "Creating configuration file with defaults: %r" % configfile
             parser.add_section('main')
             parser.set('main', 'port', '22')
-            parser.set('main', 'config_port', '8443')
-            parser.set('main', 'discover_port', '8444')
-            parser.set('main', 'host_port', '8445')
             parser.set('main', 'private_key', '%(here)s/privatekey.pem')
-            parser.set('main', 'certificate', '%(here)s/certificate.pem')
+            parser.set('main', 'motd_file', '%(here)s/motd.txt')
+
+            motd_file = join(configdir, 'motd.txt')
+            if not isfile(motd_file):
+                open(motd_file, 'w').write(
+                    "%(green)s  Welcome to the SSHg console terminal. "
+                    "Type ? for help."
+                )
 
             parser.add_section('database')
             parser.set('database', 'echo', 'false')
@@ -190,20 +180,22 @@ class SSHgOptions(BaseOptions):
             parser.set('database', 'name', 'database.db')
             parser.set('database', 'path', '%(here)s')
             parser.write(open(configfile, 'w'))
-            print "Please check configuration and run the setup command"
+            print "Please check configuration and run the setup command again"
             sys.exit(0)
 
         parser.read([configfile])
         parser.set('DEFAULT', 'here', configdir)
 
         config.dir = configdir
-        config.static_dir = abspath(parser.get('main', 'static_dir'))
         config.port = parser.getint('main', 'port')
-        config.config_port = parser.getint('main', 'config_port')
-        config.discover_port = parser.getint('main', 'discover_port')
-        config.host_port = parser.getint('main', 'host_port')
         config.private_key = abspath(parser.get('main', 'private_key'))
-        config.certificate = abspath(parser.get('main', 'certificate'))
+
+        motd = abspath(parser.get('main', 'motd_file'))
+        if isfile(motd):
+            config.motd = open(motd).read()
+        else:
+            config.motd = "%(green)s  Welcome to the SSHg console terminal. "+ \
+                          "Type ? for help."
 
         config.db = ModuleType('config.db')
         config.db.echo = parser.getboolean('database', 'echo')

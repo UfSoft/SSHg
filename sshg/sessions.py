@@ -10,9 +10,7 @@
     :license: BSD, see LICENSE for more details.
 """
 
-from twisted.conch.insults.insults import ServerProtocol
-from twisted.conch.manhole_ssh import (TerminalSessionTransport as TSP,
-                                       TerminalSession, _Glue)
+from twisted.conch.manhole_ssh import TerminalSession
 from twisted.conch.ssh import session, channel
 from twisted.internet import reactor
 from twisted.python import components
