@@ -36,34 +36,6 @@ class FixedSSHSession(session.SSHSession):
             # Only write if we have a transport set up
             self.client.transport.write(data)
 
-class TerminalSessionTransport(TSP):
-    def __init__(self, proto, chainedProtocol, avatar, width, height):
-        self.proto = proto
-        self.avatar = avatar
-        self.chainedProtocol = chainedProtocol
-
-        session = self.proto.session
-
-        self.proto.makeConnection(
-            _Glue(write=self.chainedProtocol.dataReceived,
-                  loseConnection=lambda: avatar.conn.sendClose(session),
-                  avatar=avatar, name="SSHg Proto Transport"))
-
-        def loseConnection():
-            self.proto.loseConnection()
-
-        self.chainedProtocol.makeConnection(
-            _Glue(write=self.proto.write,
-                  loseConnection=loseConnection,
-                  avatar=avatar, name="SSHG Chained Proto Transport"))
-
-        # XXX TODO
-        # chainedProtocol is supposed to be an ITerminalTransport,
-        # maybe.  That means perhaps its terminalProtocol attribute is
-        # an ITerminalProtocol, it could be.  So calling terminalSize
-        # on that should do the right thing But it'd be nice to clean
-        # this bit up.
-        self.chainedProtocol.terminalProtocol.terminalSize(width, height)
 
 class MercurialSession(TerminalSession):
     #implements(session.ISession)
@@ -145,11 +117,8 @@ class MercurialAdminSession(MercurialSession):
     width = 80
     height = 24
 
-    transportFactory = TerminalSessionTransport
-    chainedProtocolFactory = ServerProtocol
-
-
     def openShell(self, transport):
-        self.transportFactory(transport,
-                              self.chainedProtocolFactory(AdminTerminal),
-                              self.avatar, self.width, self.height)
+        self.transportFactory(
+            transport,
+            self.chainedProtocolFactory(AdminTerminal, avatar=self.avatar),
+            self.avatar, self.width, self.height)

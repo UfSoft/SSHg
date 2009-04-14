@@ -43,6 +43,10 @@ class BaseAdminTerminal(HistoricRecvLine):
     command = parent = name = terminal = None
     commands = {}
 
+    def __init__(self, avatar=None):
+        self.avatar = avatar
+        HistoricRecvLine.__init__(self)
+
     def motd(self):
         self.terminal.write(
             "%(green)s  Welcome to the SSHg console terminal. "
@@ -59,12 +63,6 @@ class BaseAdminTerminal(HistoricRecvLine):
         self.nextLine()
         self.terminal.write(self.ps)
         self.setInsertMode()
-
-    @property
-    def avatar(self):
-        if self.terminal:
-            return self.terminal.protocol.avatar
-        return None
 
     def makeConnection(self, terminal):
         if self.terminal is None:
@@ -154,11 +152,17 @@ class BaseAdminTerminal(HistoricRecvLine):
             args, kwargs = names, ()
         log.debug('Args: %r KWArgs: %r Defaults len: %d', args, kwargs,
                   len(defaults or ()))
-        usage = ' %%(green)sUsage%%(reset)s: %s %s %%(hilight)s%s %s' %(
-            command, action,
-            ' '.join(["<%s>" % a for a in args]),
+        if command:
+            usage = ' %%(green)sUsage%%(reset)s: %s %s %%(hilight)s%s %s' %(
+                command or '', action,
+                ' '.join(["<%s>" % a for a in args]),
+                ' '.join(["[%s]" % k for k in kwargs])
+            )
+        else:
+            usage = ' %%(green)sUsage%%(reset)s: %s %%(hilight)s%s %s' %(
+                action, ' '.join(["<%s>" % a for a in args]),
             ' '.join(["[%s]" % k for k in kwargs])
-        )
+            )
         return usage % COLORS
 
     def handle_TAB(self):
@@ -418,3 +422,7 @@ class AdminTerminal(BaseAdminTerminal):
         user.change_password(password)
         session.commit()
         self.write("Password changed for user %s" % self.avatar.username)
+
+    def do_whoami(self):
+        """Tell's you who you are"""
+        self.write("You're %s!" % self.avatar.username)
