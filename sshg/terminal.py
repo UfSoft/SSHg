@@ -60,6 +60,12 @@ class BaseAdminTerminal(HistoricRecvLine):
         self.terminal.write(self.ps)
         self.setInsertMode()
 
+    @property
+    def avatar(self):
+        if self.terminal:
+            return self.terminal.protocol.avatar
+        return None
+
     def makeConnection(self, terminal):
         if self.terminal is None:
             self.terminal = terminal
@@ -380,6 +386,17 @@ class UserCommands(BaseAdminTerminal):
         session.commit()
         self.write("User %s deleted" % username)
 
+    def password(self, username, password):
+        """Change user password"""
+        session = db.session()
+        user = session.query(db.User).get(username)
+        if not user:
+            self.write("User '%s' is not known" % username)
+            return
+        user.change_password(password)
+        session.commit()
+        self.write("Password changed for user %s" % username)
+
 class AdminTerminal(BaseAdminTerminal):
     commands = {
         'users': UserCommands()
@@ -388,3 +405,16 @@ class AdminTerminal(BaseAdminTerminal):
     def do_exit(self):
         """Exit admin shell"""
         self.handle_CTRL_D()
+
+
+
+    def do_password(self, password):
+        """Change your password"""
+        session = db.session()
+        user = session.query(db.User).get(self.avatar.username)
+        if not user:
+            self.write("User '%s' is not known" % self.avatar.username)
+            return
+        user.change_password(password)
+        session.commit()
+        self.write("Password changed for user %s" % self.avatar.username)

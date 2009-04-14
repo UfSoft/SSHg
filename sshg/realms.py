@@ -16,13 +16,15 @@ from twisted.conch.ssh.session import ISession
 from twisted.python import components
 
 from sshg.avatars import MercurialUser, MercurialAdmin
-from sshg.sessions import MercurialSession, MercurialAdminSession
+from sshg.sessions import (MercurialSession, MercurialAdminSession,
+                           TerminalSessionTransport)
 from sshg.database import User, session
 from sshg import logger
 
 log = logger.getLogger(__name__)
 
 class MercurialRepositoriesRealm(TerminalRealm):
+    transportFactory = TerminalSessionTransport
 
     def requestAvatar(self, avatarId, mind, *interfaces):
         if IConchUser in interfaces:

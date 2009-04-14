@@ -202,6 +202,9 @@ class User(DeclarativeBase):
             self.last_login = datetime.utcnow()
         return valid
 
+    def change_password(self, password):
+        self.password = gen_pwhash(password)
+
     def __repr__(self):
         return \
         '<User "%(username)s"  Admin: %(is_admin)s  Locked: %(locked_out)s>' % \
