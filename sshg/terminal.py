@@ -48,8 +48,7 @@ class BaseAdminTerminal(HistoricRecvLine):
         self.avatar = avatar
 
     def motd(self):
-        self.terminal.write(config.motd % COLORS)
-        self.nextLine()
+        self.write(config.motd % COLORS)
 
     def nextLine(self):
         self.terminal.write(NORMAL_COLOR)
@@ -252,7 +251,12 @@ class BaseAdminTerminal(HistoricRecvLine):
                 runner = self.command
             else:
                 runner = self
-            if cmd in runner.commands:
+            if args and args[0] in runner.commands and cmd in runner.actions:
+                log.debug("X: Passing arguments to child command '%s': %r",
+                              args[0], [cmd] + args[1:])
+                runner.commands[args[0]].lineReceived(' '.join([cmd] + args[1:]))
+                return
+            elif cmd in runner.commands:
                 if not args:
                     self.switchToCommand(cmd)
                 else:
@@ -281,9 +285,11 @@ class BaseAdminTerminal(HistoricRecvLine):
     def do_help(self, cmd='', format=None, extended=True):
         "Get help on a command. Usage: help command"
         if cmd:
+            log.debug("Issuing help for command %r", cmd)
             func = self.getCommandFunc(cmd)
-            if not func:
-                func = self.commands.get(cmd, None)
+            if not func and cmd in self.commands:
+                self.commands[cmd].do_help(format=format, extended=extended)
+                return
             if func:
                 if extended:
                     cmd_line = func.__doc__
@@ -335,7 +341,7 @@ class BaseAdminTerminal(HistoricRecvLine):
         if isinstance(line, defer.Deferred):
             line.addCallback(self.write)
         else:
-            self.terminal.write(line)
+            defer.maybeDeferred(self.terminal.write, line)
 
 class UserCommands(BaseAdminTerminal):
     """User Commands"""
