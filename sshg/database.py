@@ -133,6 +133,10 @@ class Repository(DeclarativeBase):
         self.size = size
         self.quota = quota
 
+    def get_size(self, check=False):
+        # For now, just return the database size. At a later stage, calculate it
+        return self.size
+
     def __repr__(self):
         return \
         '<Repository Path: "%(path)s"  Size: %(size)s  Quota: %(quota)s>' % \

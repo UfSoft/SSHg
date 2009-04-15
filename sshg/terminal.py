@@ -6,6 +6,7 @@
 # License: BSD - Please view the LICENSE file for additional information.
 # ==============================================================================
 
+import os.path
 from inspect import getargspec
 from twisted.conch.recvline import HistoricRecvLine
 from sshg import logger, database as db, config
@@ -141,19 +142,30 @@ class BaseAdminTerminal(HistoricRecvLine):
         argspec = getargspec(func)
         names = argspec[0]
         names.pop(0)
-        defaults = argspec[-1] or ()
+        defaults = argspec[-1] or []
         log.debug("Separating args from kwargs")
-        args, kwargs = names[:-len(defaults)], names[-len(defaults):]
+        if defaults:
+            args, kwargs = names[:-len(defaults)], names[-len(defaults):]
+        else:
+            args, kwargs = names, defaults
         log.debug('Args: %r KWArgs: %r Defaults len: %d', args, kwargs,
                   len(defaults))
         log.debug("Command: %s OurName: %s Action: %s", command, self.name, action)
         if (self.command and self.command.name == command) or \
             (self.name == command):
             command = None
+        for idx, key in enumerate(kwargs):
+            if isinstance(defaults[idx], bool):
+                kwargs[idx] = "[%s <boolean>]" % key
+            elif isinstance(defaults[idx], basestring) or \
+                                                        defaults[idx] is None:
+                kwargs[idx] = "[%s <string>]" % key
+            elif isinstance(defaults[idx], int):
+                kwargs[idx] = "[%s <integer>]" % key
         log.debug("Filter Above: %s", filter(None, [command, action]))
         usage = ' %%(green)sUsage%%(reset)s: %s %%(hilight)s%s' %(
             ' '.join(filter(None, [command, action])),
-            ' '.join(["<%s>" % a for a in args] + ["[%s]" % k for k in kwargs])
+            ' '.join(["<%s>" % a for a in args] + kwargs)
         )
         return usage % COLORS
 
@@ -275,7 +287,7 @@ class BaseAdminTerminal(HistoricRecvLine):
         self.drawInputLine()
 
     def do_help(self, cmd='', format=None, extended=True):
-        "Get help on a command. Usage: help command"
+        "Get help on a command."
         if cmd:
             log.debug("Issuing help for command %r", cmd)
             func = self.getCommandFunc(cmd)
@@ -284,11 +296,16 @@ class BaseAdminTerminal(HistoricRecvLine):
                 self.commands[cmd].do_help(format=format, extended=extended)
                 return
             if func:
+                doclines = []
+                for line in func.__doc__.splitlines():
+                    doclines.append(line.strip())
+
                 log.debug("Found function %s for command %s", func, cmd)
-                cmd_line = extended and func.__doc__ or \
-                     " %%(light-green)s%s%%(reset)s: %s" % (cmd, func.__doc__)
+                cmd_line = extended and ' '.join(doclines) or \
+                     " %%(light-green)s%s%%(reset)s: %s" % (cmd,
+                                                            ' '.join(doclines))
                 if format and not extended:
-                    cmd_line = format % (cmd, func.__doc__)
+                    cmd_line = format % (cmd, ' '.join(doclines))
                 yield cmd_line % COLORS
                 yield self.nextLine
                 if extended:
@@ -304,7 +321,7 @@ class BaseAdminTerminal(HistoricRecvLine):
             longest = max([len(command) for command in self.actions])
             format = '%(light-green)s%%%%+%%ds%(reset)s: %%%%s' % COLORS
             for command in sorted(self.actions):
-                self.do_help(command, format % (longest+1), extended=False)
+                yield self.do_help(command, format % (longest+1), extended=False)
 
         subcommands = self.commands.keys()
         if subcommands:
@@ -313,8 +330,10 @@ class BaseAdminTerminal(HistoricRecvLine):
             yield self.nextLine
             longest = max([len(command) for command in subcommands])
             for command in subcommands:
-                yield format % (longest+2) % (command,
-                                              self.commands[command].__doc__)
+                doclines = []
+                for line in self.commands[command].__doc__.splitlines():
+                    doclines.append(line.strip())
+                yield format % (longest+2) % (command, ' '.join(doclines))
                 yield self.nextLine
 
     def drawInputLine(self):
@@ -339,7 +358,7 @@ class BaseAdminTerminal(HistoricRecvLine):
 
     def write(self, lines):
         if not lines:
-            log.debug('NOTHING TO WRITE')
+            log.debug('NOTHING TO WRITE. Got: %r', lines)
             return defer.SUCCESS
         log.debug("Received line to write: %r", lines)
         if isinstance(lines, unicode):
@@ -366,16 +385,17 @@ class UserCommands(BaseAdminTerminal):
     name = 'users'
 
     def do_list(self):
-        """List Available Users"""
+        """List Available Users."""
         yield " Available Users:"
         yield self.nextLine
         session = db.session()
         for username in session.query(db.User.username).all():
             log.debug("Found username: %s", username[0])
             yield u'  ' + username[0]
+            yield self.nextLine
 
     def do_add(self, username, password, is_admin=False):
-        """Add a new user"""
+        """Add a new user."""
         session = db.session()
         user = db.User(username, password, bool(is_admin))
         session.add(user)
@@ -383,7 +403,7 @@ class UserCommands(BaseAdminTerminal):
         yield "User %s added" % username
 
     def do_details(self, username):
-        """Show user details"""
+        """Show user details."""
         session = db.session()
         user = session.query(db.User).get(username)
         if not user:
@@ -424,10 +444,40 @@ class UserCommands(BaseAdminTerminal):
         session.commit()
         yield "Password changed for user %s" % username
 
-class RepositoriesCommands(BaseAdminTerminal):
+
+
+class BaseRepositoryCommands(BaseAdminTerminal):
+
+    def _exists(self, session, reponame):
+        return session.query(db.Repository).get(reponame)
+
+class RepositoryUsersCommands(BaseRepositoryCommands):
+    """Repository users commands."""
+    name = 'repousers'
+
+    def do_list(self, reponame):
+        """List repository users."""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            yield  "A repository by the name of %s was not found." % reponame
+            return
+        log.debug(repo)
+        yield " Repository Users:"
+        yield self.nextLine
+        if not repo.users:
+            yield "Repository has no users."
+            return
+        for user in repo.users:
+            yield "  %s" % user.username
+            yield self.nextLine
+
+class RepositoriesCommands(BaseRepositoryCommands):
     """Repositories Commands"""
 
     name = 'repos'
+
+    commands = {'users': RepositoryUsersCommands()}
 
     def do_list(self):
         """List available repositories"""
@@ -441,6 +491,84 @@ class RepositoriesCommands(BaseAdminTerminal):
         for repo in repos:
             yield "  %s" % repo[0]
             yield self.nextLine
+
+    def do_add(self, reponame, repopath, size=0, quota=0):
+        """Add repository."""
+        session = db.session()
+        if self._exists(session, reponame):
+            return "A repository by the name of %s already exists." % reponame
+        if not os.path.isdir(repopath):
+            return "The path to the repository '%s' does not exist." % repopath
+        elif not os.path.isdir(os.path.join(repopath, '.hg')):
+            return ("The path to the repository '%s' exists but does not "
+                    "seem to be a valid mercurial repository.") % repopath
+        repo = db.Repository(reponame, repopath, size, quota)
+        session.add(repo)
+        session.commit()
+        return "Repository added.\n"
+
+    def do_size(self, reponame):
+        """Check the repository's current size"""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            return "A repository by the name of %s was not found." % reponame
+        log.debug(repo)
+        size = repo.get_size()
+        return "Size: %s" % (size==0 and 'unlimited' or size)
+
+    def do_quota(self, reponame, quota=0):
+        """Check or set the repository's permitted quota"""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            return "A repository by the name of %s was not found." % reponame
+        log.debug(repo)
+        if quota:
+            repo.quota = int(quota)
+            session.commit()
+            return "Repository quota updated to %s" % (repo.quota==0 and
+                                                       'unlimited' or
+                                                       repo.quota)
+        return "Quota: %s" % (repo.quota==0 and 'unlimited' or repo.quota)
+
+    def do_users(self, reponame, username=None):
+        """Add a user to the repository. This user will be allowed to write
+        to it"""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            yield  "A repository by the name of %s was not found." % reponame
+            return
+        log.debug(repo)
+        if not username:
+            if repo.users:
+                yield " Repository Users:"
+                yield self.nextLine
+                for user in repo.users:
+                    yield "  %s" % user.username
+                    yield self.nextLine
+            else:
+                yield "Repository has no users."
+            return
+        user = session.query(db.User).get(username)
+        if not user:
+            yield "User %s is not known" % username
+            return
+        repo.users.append(user)
+        session.commit()
+        yield "User %s added to the %s repository users" % (username, reponame)
+
+
+    def do_managers(self, reponame, manager=None):
+        """Add a user as a manager to the repository. This user will be allowed
+        to manage the repository"""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            return "A repository by the name of %s was not found." % reponame
+        log.debug(repo)
+
 
 class AdminTerminal(BaseAdminTerminal):
     commands = {
