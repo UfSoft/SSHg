@@ -146,6 +146,11 @@ class BaseAdminTerminal(HistoricRecvLine):
         args, kwargs = names[:-len(defaults)], names[-len(defaults):]
         log.debug('Args: %r KWArgs: %r Defaults len: %d', args, kwargs,
                   len(defaults))
+        log.debug("Command: %s OurName: %s Action: %s", command, self.name, action)
+        if (self.command and self.command.name == command) or \
+            (self.name == command):
+            command = None
+        log.debug("Filter Above: %s", filter(None, [command, action]))
         usage = ' %%(green)sUsage%%(reset)s: %s %%(hilight)s%s' %(
             ' '.join(filter(None, [command, action])),
             ' '.join(["<%s>" % a for a in args] + ["[%s]" % k for k in kwargs])
@@ -168,6 +173,7 @@ class BaseAdminTerminal(HistoricRecvLine):
                            ' '.join(actions + commands) % COLORS)
                 self.nextLine()
                 self.drawInputLine()
+                break
             elif len(commands) == 1:
                 if commands[0] in self.commands:
                     log.debug('Matched Command: %s', commands[0])
@@ -189,7 +195,7 @@ class BaseAdminTerminal(HistoricRecvLine):
         else:
             log.debug('No more line buffer')
             if action:
-                runner = command or self.command or self
+                runner = command or self
                 if action == 'help':
                     log.debug('On help returning available actions for %r',
                               runner.__class__)
@@ -200,6 +206,7 @@ class BaseAdminTerminal(HistoricRecvLine):
                     self.drawInputLine()
                     return
                 func = getattr(runner, 'do_%s' % action)
+
                 usage = self.getFuncUsage(func, runner.name, action)
                 self.nextLine()
                 self.write(usage)
@@ -242,9 +249,10 @@ class BaseAdminTerminal(HistoricRecvLine):
             else:
                 runner = self
             if args and args[0] in runner.commands and cmd in runner.actions:
-                log.debug("X: Passing arguments to child command '%s': %r",
-                              args[0], [cmd] + args[1:])
-                runner.commands[args[0]].lineReceived(' '.join([cmd] + args[1:]))
+                new_cmd = args.pop(0)
+                log.debug("Passing arguments to child command '%s': %r",
+                          new_cmd, [cmd] + args)
+                runner.commands[new_cmd].lineReceived(' '.join([cmd] + args))
                 return
             elif cmd in runner.commands:
                 if not args:
@@ -257,15 +265,9 @@ class BaseAdminTerminal(HistoricRecvLine):
             func = runner.getCommandFunc(cmd)
             log.debug("Discovered function: %s", func)
             if callable(func):
-                def error(exception):
-                    log.debug("Exception catched: %s", exception)
-                    if exception.type is TypeError:
-                        self.write('not enough arguments passed')
-                    else:
-                        self.write('command failed to execute')
                 d = defer.maybeDeferred(func, *args)
                 d.addCallback(self.write)
-                d.addErrback(error)
+                d.addErrback(self.commandExecutionFailed)
             else:
                 self.write("No such command: '%s'" %
                            ' '.join(filter(None, [self.name, line])))
@@ -278,27 +280,27 @@ class BaseAdminTerminal(HistoricRecvLine):
             log.debug("Issuing help for command %r", cmd)
             func = self.getCommandFunc(cmd)
             if not func and cmd in self.commands:
+                log.debug("Calling regular help for command %s" % cmd)
                 self.commands[cmd].do_help(format=format, extended=extended)
                 return
             if func:
-                if extended:
-                    cmd_line = func.__doc__
-                else:
-                    cmd_line = " %%(light-green)s%s%%(reset)s: %s" % (
-                                                            cmd, func.__doc__)
-                    if format:
-                        cmd_line = format % (cmd, func.__doc__)
-                self.terminal.write(cmd_line % COLORS)
-                self.nextLine()
+                log.debug("Found function %s for command %s", func, cmd)
+                cmd_line = extended and func.__doc__ or \
+                     " %%(light-green)s%s%%(reset)s: %s" % (cmd, func.__doc__)
+                if format and not extended:
+                    cmd_line = format % (cmd, func.__doc__)
+                yield cmd_line % COLORS
+                yield self.nextLine
                 if extended:
                     usage = self.getFuncUsage(func, self.name, cmd)
-                    self.write(usage)
-                    self.nextLine()
+                    yield usage
+                    yield self.nextLine
                 return
 
+
         if self.actions:
-            self.terminal.write("%(yellow)sCommands:" % COLORS)
-            self.nextLine()
+            yield "%(yellow)sCommands:" % COLORS
+            yield self.nextLine
             longest = max([len(command) for command in self.actions])
             format = '%(light-green)s%%%%+%%ds%(reset)s: %%%%s' % COLORS
             for command in sorted(self.actions):
@@ -307,31 +309,56 @@ class BaseAdminTerminal(HistoricRecvLine):
         subcommands = self.commands.keys()
         if subcommands:
             log.debug("SubCommands: %r", subcommands)
-            self.terminal.write("%(yellow)sSub-Commands:" % COLORS)
-            self.nextLine()
+            yield "%(yellow)sSub-Commands:" % COLORS
+            yield self.nextLine
             longest = max([len(command) for command in subcommands])
             for command in subcommands:
-                self.do_help(command, format % (longest+2), extended=False)
+                yield format % (longest+2) % (command,
+                                              self.commands[command].__doc__)
+                yield self.nextLine
 
     def drawInputLine(self):
         if self.command:
-            self.terminal.write(self.psc % self.command.name +
-                                ''.join(self.lineBuffer))
+            self.write(self.psc % self.command.name + ''.join(self.lineBuffer))
         else:
-            self.terminal.write(self.ps + ''.join(self.lineBuffer))
+            self.write(self.ps + ''.join(self.lineBuffer))
 
-    def keystrokeReceived(self, keyID, modifier):
-        m = self.keyHandlers.get(keyID)
-        if m is not None:
-            m()
+    def keystrokeReceived(self, key_id, modifier):
+        handler = self.keyHandlers.get(key_id)
+        if handler is not None:
+            handler()
         else:
-            self.characterReceived(keyID, False)
+            self.characterReceived(key_id, False)
 
-    def write(self, line):
-        if isinstance(line, defer.Deferred):
-            line.addCallback(self.write)
+    def commandExecutionFailed(self, exception):
+        log.debug("Exception catched: %s", exception)
+        if exception.type is TypeError:
+            self.write('not enough arguments passed')
         else:
-            defer.maybeDeferred(self.terminal.write, line)
+            self.write('command failed to execute')
+
+    def write(self, lines):
+        if not lines:
+            log.debug('NOTHING TO WRITE')
+            return defer.SUCCESS
+        log.debug("Received line to write: %r", lines)
+        if isinstance(lines, unicode):
+            lines = lines.encode('utf-8')
+            lines = lines % COLORS
+            log.debug("Line to actually Write: %r", lines)
+        elif isinstance(lines, basestring):
+            lines = lines % COLORS
+        if hasattr(lines ,'__iter__'):
+            for line in lines:
+                if callable(line):
+                    line()
+                else:
+                    self.write(line)
+        elif isinstance(lines, defer.Deferred):
+            lines.addCallbacks(self.write, self.commandExecutionFailed)
+        else:
+            d = defer.maybeDeferred(self.terminal.write, lines)
+            d.addErrback(self.commandExecutionFailed)
 
 class UserCommands(BaseAdminTerminal):
     """User Commands"""
@@ -340,13 +367,12 @@ class UserCommands(BaseAdminTerminal):
 
     def do_list(self):
         """List Available Users"""
-        self.terminal.write('Available Users:')
-        self.nextLine()
+        yield " Available Users:"
+        yield self.nextLine
         session = db.session()
         for username in session.query(db.User.username).all():
-            log.debug(username)
-            self.terminal.write('  ' + username[0].encode('utf-8'))
-            self.terminal.nextLine()
+            log.debug("Found username: %s", username[0])
+            yield u'  ' + username[0]
 
     def do_add(self, username, password, is_admin=False):
         """Add a new user"""
@@ -354,50 +380,72 @@ class UserCommands(BaseAdminTerminal):
         user = db.User(username, password, bool(is_admin))
         session.add(user)
         session.commit()
-        self.write("User %s added" % username)
+        yield "User %s added" % username
 
     def do_details(self, username):
         """Show user details"""
         session = db.session()
         user = session.query(db.User).get(username)
         if not user:
-            self.write("User '%s' is not known" % username)
-            self.nextLine()
-            self.drawInputLine()
+            yield "User '%s' is not known" % username
+            yield self.nextLine
+            yield self.drawInputLine()
             return
-        w = lambda txt: (self.write(txt % COLORS), self.nextLine())
-        w("%%(hilight)s   Username%%(reset)s: %s" %
-          user.username.encode('utf-8'))
-        w("%%(hilight)s   Added On%%(reset)s: %s" % user.added_on)
-        w("%%(hilight)s Last Login%%(reset)s: %s" % user.last_login)
-        w("%%(hilight)s Locked Out%%(reset)s: %s" % user.locked_out)
-        w("%%(hilight)s   Is Admin%%(reset)s: %s" % user.is_admin)
+        yield "%%(hilight)s   Username%%(reset)s: %s" % user.username
+        yield self.nextLine
+        yield "%%(hilight)s   Added On%%(reset)s: %s" % user.added_on
+        yield self.nextLine
+        yield "%%(hilight)s Last Login%%(reset)s: %s" % user.last_login
+        yield self.nextLine
+        yield "%%(hilight)s Locked Out%%(reset)s: %s" % user.locked_out
+        yield self.nextLine
+        yield "%%(hilight)s   Is Admin%%(reset)s: %s" % user.is_admin
+        yield self.nextLine
 
     def do_delete(self, username):
         """Remove a user from database"""
         session = db.session()
         user = session.query(db.User).get(username)
         if not user:
-            self.write("User '%s' is not known" % username)
+            yield "User '%s' is not known" % username
             return
         session.delete(user)
         session.commit()
-        self.write("User %s deleted" % username)
+        yield "User %s deleted" % username
 
-    def password(self, username, password):
+    def do_password(self, username, password):
         """Change user password"""
         session = db.session()
         user = session.query(db.User).get(username)
         if not user:
-            self.write("User '%s' is not known" % username)
+            yield "User '%s' is not known" % username
             return
         user.change_password(password)
         session.commit()
-        self.write("Password changed for user %s" % username)
+        yield "Password changed for user %s" % username
+
+class RepositoriesCommands(BaseAdminTerminal):
+    """Repositories Commands"""
+
+    name = 'repos'
+
+    def do_list(self):
+        """List available repositories"""
+        session = db.session()
+        repos = session.query(db.Repository.name).all()
+        if not repos:
+            yield "No available repositories"
+            return
+        yield " Available Repositories:"
+        yield self.nextLine
+        for repo in repos:
+            yield "  %s" % repo[0]
+            yield self.nextLine
 
 class AdminTerminal(BaseAdminTerminal):
     commands = {
-        'users': UserCommands()
+        'users': UserCommands(),
+        'repos': RepositoriesCommands()
     }
 
     def do_exit(self):
@@ -411,12 +459,12 @@ class AdminTerminal(BaseAdminTerminal):
         session = db.session()
         user = session.query(db.User).get(self.avatar.username)
         if not user:
-            self.write("User '%s' is not known" % self.avatar.username)
+            yield "User '%s' is not known" % self.avatar.username
             return
         user.change_password(password)
         session.commit()
-        self.write("Password changed for user %s" % self.avatar.username)
+        yield "Password changed for user %s" % self.avatar.username
 
     def do_whoami(self):
         """Tell's you who you are"""
-        self.write("You're %s!" % self.avatar.username)
+        yield "You're %s!" % self.avatar.username
