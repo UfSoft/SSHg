@@ -6,11 +6,12 @@
 # License: BSD - Please view the LICENSE file for additional information.
 # ==============================================================================
 
-
+import shlex
+from os.path import commonprefix
 from twisted.conch.recvline import HistoricRecvLine
 from twisted.internet import defer
 from sshg import config, logger
-from sshg.terminal.commands import BasicAdminCommands
+from sshg.terminal.commands import BasicAdminCommands, CommandNotFound
 
 log = logger.getLogger(__name__)
 
@@ -104,44 +105,67 @@ class AdminTerminal(HistoricRecvLine):
             self.characterReceived(key_id, False)
 
     def lineReceived(self, line):
-        line = line.strip()
         log.debug("Received line on %s: %r", self.__class__.__name__, line)
-        args = line.split()
+        args = shlex.split(line)
+        action = None
         command = self.selectedCommand
-        while args:
-            log.debug("Current Command: %r  Remaining Args: %r", command, args)
-            action = args.pop(0)
-            if action == '/' and not args:
+        while True:
+            log.debug("Current Command: %r  Current Action: %r  "
+                      "Remaining Args: %r", command, action, args)
+            arg = args.pop(0)
+            log.debug("Processing arg: %r", arg)
+            if arg == '/' and not args:
                 self.switchCommand(self.defaultCommand)
-                break
-            elif action == '..':
+                self.nextLine()
+                self.drawInputLine()
+                return
+            elif arg == '..':
                 self.switchCommand(self.selectedCommand.parent)
-                break
-            elif action == '?':
-                action = 'help'
+                self.nextLine()
+                self.drawInputLine()
+                return
+            elif arg == '?':
+                arg = 'help'
 
-            if action in command.commands:
-                command = command.commands[action]
-                if not args and action not in command.actions:
-                    self.switchCommand(command)
+            if arg in command.commands:
+                if not args and action != 'help':
+                    log.debug("Issue switch command to %r", command)
+                    self.switchCommand(command.commands[arg])
+                    self.nextLine()
+                    self.drawInputLine()
+                    return
+                elif not args and action == 'help':
+                    args = [arg]
                     break
                 else:
+                    log.debug("Remaining args: %r", args)
+                    command = command.commands[arg]
+                    log.debug("Switched to command: %r Remaining Args: %r",
+                              command, args)
                     continue
+            elif action == 'help' and arg in command.actions and not args:
+                log.debug("Issue help for action %s on command %s",
+                          action, command)
+                args = [arg]
+                break
+            elif arg in command.actions and args:
+                action = arg
+            elif not args and arg not in command.actions:
+                args = [arg]
+                break
+            elif not args:
+                break
 
-            log.debug("X: Current Command: %r  Remaining Args: %r",
-                      command, args)
-
-            func = command.get_action(action)
-            log.debug("Discovered function: %s", func)
-            if callable(func):
-                d = defer.maybeDeferred(func, *args)
-                d.addCallback(self.write)
-                d.addErrback(self.commandExecutionFailed)
-            else:
-                self.write("No such command: '%s'" % ' '.join(
-                    filter(None, [self.selectedCommand.cmdname, line]))
-                )
-            break
+        log.debug("Command: %r  Action: %r  Args: %r",
+                  command, action, args)
+        func = command.get_action(action)
+        if callable(func):
+            log.debug("Discovered function: %s Remaining Args: %r",
+                      func, args)
+            d = defer.maybeDeferred(func, *args)
+            d.addCallback(self.write).addErrback(self.commandExecutionFailed)
+        else:
+            self.write("No such command: '%s'" % line)
         self.nextLine()
         self.drawInputLine()
 
@@ -180,6 +204,8 @@ class AdminTerminal(HistoricRecvLine):
         log.debug("Exception catched: %s", exception)
         if exception.type is TypeError:
             self.write('wrong number of arguments passed')
+        elif exception.type is CommandNotFound:
+            self.write("No such command: '%s'" % exception.value)
         else:
             self.write('command failed to execute')
 
@@ -188,19 +214,25 @@ class AdminTerminal(HistoricRecvLine):
 
     def handle_TAB(self):
         log.debug("Linebuffer: %s", self.currentLineBuffer())
-        buff = self.currentLineBuffer()[0].split()
+        buff = shlex.split(self.currentLineBuffer()[0])
         command = self.selectedCommand
         log.debug("CMD: %r", command)
         action = None
         while buff:
             prefix = buff.pop(0)
             log.debug('Current Prefix: %r', prefix)
+            log.debug('Current Command: %r', command)
+            log.debug('Current Action: %r', action)
+            if not buff and self.lineBuffer[-1] == ' ':
+                prefix += ' '
             commands, actions = command.get_matches(prefix, command)
             log.debug("Matching: %r %r", commands, actions)
             if len(actions) > 1 or len(commands) > 1:
+                extended_buffer = commonprefix(actions + commands)[len(prefix):]
+                self.lineBuffer.extend(extended_buffer)
+                self.lineBufferIndex = len(self.lineBuffer)
                 self.nextLine()
-                self.write("%%(HI)s%s%%(RST)s" %
-                           ' '.join(actions + commands))
+                self.write("%%(HI)s%s%%(RST)s" % ' '.join(actions + commands))
                 self.nextLine()
                 self.drawInputLine()
                 break
@@ -243,7 +275,6 @@ class AdminTerminal(HistoricRecvLine):
                     self.nextLine()
                     self.drawInputLine()
                     return
-
                 func = getattr(command, 'do_%s' % action)
                 usage = command.get_usage(func, command.cmdname, action)
                 self.nextLine()

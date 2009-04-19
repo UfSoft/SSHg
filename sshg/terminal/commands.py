@@ -12,6 +12,9 @@ from sshg import database as db, logger
 
 log = logger.getLogger(__name__)
 
+class CommandNotFound(Exception):
+    """Exception raise for not found commands"""
+
 class BaseCommand(object):
     """Base Terminal Commands Interface"""
     cmdname = None
@@ -42,7 +45,6 @@ class BaseCommand(object):
     def get_matches(self, prefix, command=None):
         """Get the actions and/or sub-commands matching the passed prefix."""
         log.debug("MatchingCommands -> Prefix: %r Command: %r", prefix, command)
-        prefix = prefix.strip()
         command = command or self
         commands = [cmd for cmd in command.commands.keys()
                     if cmd.startswith(prefix)]
@@ -93,14 +95,27 @@ class BaseCommand(object):
     def get_action(self, action):
         return getattr(self, "do_%s" % action, None)
 
+    def check_perms(self, session, repository=None):
+        user = session.query(db.User).get(self.terminal.avatar.username)
+        if user.is_admin:
+            return True
+        if repository:
+            return user in repository.managers
+        return False
+
     def do_help(self, cmd=None, format=None, extended=True):
         """Get help for a all or a specific command."""
+        log.debug("Received help request. CMD: %r", cmd)
         if cmd:
             func = self.get_action(cmd)
             if not func and cmd in self.commands:
                 log.debug("Calling regular help for command %s" % cmd)
-                self.commands[cmd].do_help(format=format, extended=extended)
+                for line in self.commands[cmd].do_help(format=format,
+                                                       extended=extended):
+                    yield line
                 return
+            if not func and cmd not in self.commands:
+                raise CommandNotFound(cmd)
             elif func:
                 log.debug("Found function %s for command %s", func, cmd)
                 cmd_line = extended and ' '.join(self.get_doc(func)) or \
@@ -149,7 +164,7 @@ class UserCommands(BaseCommand):
 
     def do_list(self):
         """List Available Users."""
-        yield " Available Users:"
+        yield "%(HI)s Available Users:"
         yield self.nextLine
         session = db.session()
         for username in session.query(db.User.username).all():
@@ -160,34 +175,55 @@ class UserCommands(BaseCommand):
     def do_add(self, username, password, is_admin=False):
         """Add a new user."""
         session = db.session()
+        if not self.check_perms(session):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
         user = db.User(username, password, bool(is_admin))
         session.add(user)
         session.commit()
         yield "User %s added" % username
 
-    def do_details(self, username):
-        """Show user details."""
+    def do_add_pubkey(self, username, public_key):
+        """Add a public key for a user."""
         session = db.session()
+        if not self.check_perms(session):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
         user = session.query(db.User).get(username)
         if not user:
             yield "User '%s' is not known" % username
-            yield self.nextLine
-            yield self.terminal.drawInputLine
             return
-        yield "%%(hilight)s   Username%%(reset)s: %s" % user.username
+        user.keys.append(db.PublicKey(''.join(public_key)))
+        session.commit()
+        yield "Public key added."
+
+    def do_details(self, username):
+        """Show user details."""
+        session = db.session()
+        if not self.check_perms(session):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
+        user = session.query(db.User).get(username)
+        if not user:
+            yield "User '%s' is not known" % username
+            return
+        yield "%%(HI)s   Username%%(RST)s: %s" % user.username
         yield self.nextLine
-        yield "%%(hilight)s   Added On%%(reset)s: %s" % user.added_on
+        yield "%%(HI)s   Added On%%(RST)s: %s" % user.added_on
         yield self.nextLine
-        yield "%%(hilight)s Last Login%%(reset)s: %s" % user.last_login
+        yield "%%(HI)s Last Login%%(RST)s: %s" % user.last_login
         yield self.nextLine
-        yield "%%(hilight)s Locked Out%%(reset)s: %s" % user.locked_out
+        yield "%%(HI)s Locked Out%%(RST)s: %s" % user.locked_out
         yield self.nextLine
-        yield "%%(hilight)s   Is Admin%%(reset)s: %s" % user.is_admin
-        yield self.nextLine
+        yield "%%(HI)s   Is Admin%%(RST)s: %s" % user.is_admin
+#        yield self.nextLine
 
     def do_delete(self, username):
         """Remove a user from database"""
         session = db.session()
+        if not self.check_perms(session):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
         user = session.query(db.User).get(username)
         if not user:
             yield "User '%s' is not known" % username
@@ -199,6 +235,9 @@ class UserCommands(BaseCommand):
     def do_password(self, username, password):
         """Change user password"""
         session = db.session()
+        if not self.check_perms(session):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
         user = session.query(db.User).get(username)
         if not user:
             yield "User '%s' is not known" % username
@@ -226,8 +265,11 @@ class RepositoryUsersCommands(BaseRepositoryCommands):
         if not repo:
             yield  "A repository by the name of %s was not found." % reponame
             return
+        if not self.check_perms(session, repo):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
         log.debug(repo)
-        yield " Repository Users:"
+        yield "%(HI)s Repository Users:"
         yield self.nextLine
         if not repo.users:
             yield "Repository has no users."
@@ -236,11 +278,79 @@ class RepositoryUsersCommands(BaseRepositoryCommands):
             yield "  %s" % user.username
             yield self.nextLine
 
+class RepositoryManagersCommands(BaseRepositoryCommands):
+    """Repository managers commands."""
+
+    cmdname = 'managers'
+
+    def do_list(self, reponame):
+        """List repository users."""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            yield  "A repository by the name of %s was not found." % reponame
+            return
+        if not self.check_perms(session, repo):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
+        log.debug(repo)
+        yield "%(HI)s Repository Managers:"
+        yield self.nextLine
+        if not repo.managers:
+            yield "  Repository has no managers."
+            return
+        for user in repo.managers:
+            yield "  %s" % user.username
+            yield self.nextLine
+
+    def do_add(self, reponame, username):
+        """Add username as a manager of the repository."""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            yield  "A repository by the name of %s was not found." % reponame
+            return
+        if not self.check_perms(session, repo):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
+        log.debug(repo)
+
+        user = session.query(db.User).get(username)
+        if not user:
+            yield "User %s is not known" % username
+            return
+        repo.managers.append(user)
+        session.commit()
+        yield "User %s added to the %s repository managers" % (username,
+                                                               reponame)
+
+    def do_delete(self, reponame, username):
+        """Add username as a manager of the repository."""
+        session = db.session()
+        repo = self._exists(session, reponame)
+        if not repo:
+            yield  "A repository by the name of %s was not found." % reponame
+            return
+        if not self.check_perms(session, repo):
+            yield "%(LR)Error:%(RST)s You don't have the required permissions."
+            return
+        log.debug(repo)
+
+        user = session.query(db.User).get(username)
+        if not user:
+            yield "User %s is not known" % username
+            return
+        repo.managers.pop(repo.managers.index(user))
+        session.commit()
+        yield "User %s deleted from the %s repository managers" % (username,
+                                                                   reponame)
+
+
 class RepositoriesCommands(BaseRepositoryCommands):
     """Repositories Commands"""
 
     cmdname = 'repos'
-    __commands__ = [RepositoryUsersCommands]
+    __commands__ = [RepositoryUsersCommands, RepositoryManagersCommands]
 
     def do_list(self):
         """List available repositories"""
@@ -249,7 +359,7 @@ class RepositoriesCommands(BaseRepositoryCommands):
         if not repos:
             yield "No available repositories"
             return
-        yield " Available Repositories:"
+        yield "%(HI)s Available Repositories:"
         yield self.nextLine
         for repo in repos:
             yield "  %s" % repo[0]
@@ -258,6 +368,8 @@ class RepositoriesCommands(BaseRepositoryCommands):
     def do_add(self, reponame, repopath, size=0, quota=0):
         """Add repository."""
         session = db.session()
+        if not self.check_perms(session):
+            return "%(LR)Error:%(RST)s You don't have the required permissions."
         if self._exists(session, reponame):
             return "A repository by the name of %s already exists." % reponame
         if not os.path.isdir(repopath):
@@ -276,6 +388,8 @@ class RepositoriesCommands(BaseRepositoryCommands):
         repo = self._exists(session, reponame)
         if not repo:
             return "A repository by the name of %s was not found." % reponame
+        if not self.check_perms(session, repo):
+            return "%(LR)Error:%(RST)s You don't have the required permissions."
         log.debug(repo)
         size = repo.get_size()
         return "Size: %s" % (size==0 and 'unlimited' or size)
@@ -286,6 +400,8 @@ class RepositoriesCommands(BaseRepositoryCommands):
         repo = self._exists(session, reponame)
         if not repo:
             return "A repository by the name of %s was not found." % reponame
+        if not self.check_perms(session, repo):
+            return "%(LR)Error:%(RST)s You don't have the required permissions."
         log.debug(repo)
         if quota:
             repo.quota = int(quota)
@@ -294,43 +410,6 @@ class RepositoriesCommands(BaseRepositoryCommands):
                                                        'unlimited' or
                                                        repo.quota)
         return "Quota: %s" % (repo.quota==0 and 'unlimited' or repo.quota)
-
-    def do_users(self, reponame, username=None):
-        """Add a user to the repository. This user will be allowed to write
-        to it"""
-        session = db.session()
-        repo = self._exists(session, reponame)
-        if not repo:
-            yield  "A repository by the name of %s was not found." % reponame
-            return
-        log.debug(repo)
-        if not username:
-            if repo.users:
-                yield " Repository Users:"
-                yield self.nextLine
-                for user in repo.users:
-                    yield "  %s" % user.username
-                    yield self.nextLine
-            else:
-                yield "Repository has no users."
-            return
-        user = session.query(db.User).get(username)
-        if not user:
-            yield "User %s is not known" % username
-            return
-        repo.users.append(user)
-        session.commit()
-        yield "User %s added to the %s repository users" % (username, reponame)
-
-
-    def do_managers(self, reponame, manager=None):
-        """Add a user as a manager to the repository. This user will be allowed
-        to manage the repository"""
-        session = db.session()
-        repo = self._exists(session, reponame)
-        if not repo:
-            return "A repository by the name of %s was not found." % reponame
-        log.debug(repo)
 
 
 class BasicAdminCommands(BaseCommand):
@@ -341,7 +420,7 @@ class BasicAdminCommands(BaseCommand):
 
     def do_exit(self):
         """Exit admin shell."""
-        self.terminal.looseConnection()
+        self.terminal.loseConnection()
 
     def do_password(self, password):
         """Change your password."""
