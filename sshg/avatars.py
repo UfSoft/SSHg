@@ -19,6 +19,7 @@ from twisted.conch.ssh import keys
 from twisted.conch.ssh.session import ISession
 from twisted.conch.ssh.filetransfer import SFTPError, ISFTPServer
 from twisted.conch.unix import UnixConchUser
+from twisted.conch.avatar import ConchUser
 from twisted.internet import defer
 from twisted.python import components, log
 
@@ -39,12 +40,12 @@ def validPublicKey(public_key_contents):
         return False
     return True
 
-class MercurialUser(UnixConchUser, components.Adapter):
+class MercurialUser(ConchUser, components.Adapter):
     homeDir = _user = _keys = keys_file_path = None
 
     def __init__(self, original, username):
         components.Adapter.__init__(self, original)
-        UnixConchUser.__init__(self, username)
+        ConchUser.__init__(self)
         self.username = username
         self.channelLookup.update({'session': FixedSSHSession})
         self.subsystemLookup.update({'sftp': FileTransferServer})

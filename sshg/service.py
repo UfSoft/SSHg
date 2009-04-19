@@ -26,7 +26,7 @@ from twisted.python import usage
 from zope.interface import implements
 
 from sshg import __version__, __summary__, application, config
-from sshg.checkers import MercurialPublicKeysDB
+from sshg.checkers import MercurialAuthenticationChekers
 from sshg.database import create_engine, metadata, session, User, PublicKey
 from sshg.factories import MercurialReposFactory
 from sshg.portals import MercurialRepositoriesPortal
@@ -132,7 +132,7 @@ class ServiceOptions(BaseOptions):
 
         realm = MercurialRepositoriesRealm()
         portal = MercurialRepositoriesPortal(realm)
-        portal.registerChecker(MercurialPublicKeysDB())
+        portal.registerChecker(MercurialAuthenticationChekers())
         factory = MercurialReposFactory(realm, portal)
         return internet.TCPServer(config.port, factory)
 

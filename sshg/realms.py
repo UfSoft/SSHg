@@ -18,7 +18,7 @@ from twisted.python import components
 from sshg.avatars import MercurialUser, MercurialAdmin
 from sshg.sessions import MercurialSession, MercurialAdminSession
 from sshg.database import User, session
-from sshg import logger
+from sshg import logger, database as db
 
 log = logger.getLogger(__name__)
 
@@ -26,9 +26,9 @@ class MercurialRepositoriesRealm(TerminalRealm):
 
     def requestAvatar(self, avatarId, mind, *interfaces):
         if IConchUser in interfaces:
-            Session = session()
-            user = Session.query(User).get(avatarId)
-            if user.is_admin:
+            session = db.session()
+            user = session.query(db.User).get(avatarId)
+            if user.is_admin or user.manages:
                 log.debug("User %s is an admin", avatarId)
                 self.userFactory = MercurialAdmin
                 self.sessionFactory = MercurialAdminSession
@@ -36,7 +36,7 @@ class MercurialRepositoriesRealm(TerminalRealm):
                 log.debug("User %s is a regular user", avatarId)
                 self.userFactory = MercurialUser
                 self.sessionFactory = MercurialSession
-            Session.close()
+            session.close()
             avatar = self._getAvatar(avatarId)
             return IConchUser, avatar, avatar.logout
         raise Exception, "No supported interfaces found."

@@ -126,7 +126,8 @@ class Repository(DeclarativeBase):
 #                          backref="repositories")
     users   = db.relation("User", secondary=repousers_association,
                           backref="repos")
-    managers = db.relation("User", secondary=repomanagers_association)
+    managers = db.relation("User", secondary=repomanagers_association,
+                           backref="manages")
 
     def __init__(self, name, repo_path, size=0, quota=0):
         self.name = name
