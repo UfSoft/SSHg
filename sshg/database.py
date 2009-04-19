@@ -25,6 +25,7 @@ from sqlalchemy.engine.url import make_url, URL
 from sshg import logger
 from sshg.utils.crypto import gen_pwhash, check_pwhash
 
+from twisted.conch.ssh.keys import Key
 from twisted.python import log as twlog
 
 log = logger.getLogger(__name__)
@@ -166,14 +167,14 @@ class PublicKey(DeclarativeBase):
 #    repositories = None
 
     def __init__(self, key_contents):
-        self.key = key_contents
+        self.key = Key.fromString(key_contents).toString("OPENSSH")
 
     def update_stamp(self):
         self.used_on = datetime.utcnow()
 
     def __repr__(self):
-        return '<PublicKey "%s..." from "%(username)s">' % (self.key[5:],
-                                                            self.user.__dict__)
+        return '<PublicKey "%s..." from "%s">' % (self.key.split()[1][5:],
+                                                  self.owner.username)
 
 
 class User(DeclarativeBase):
