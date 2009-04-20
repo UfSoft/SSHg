@@ -24,6 +24,7 @@ from sshg import database as db, logger
 
 log = logger.getLogger(__name__)
 
+
 class MercurialAuthenticationChekers(object):
     credentialInterfaces = ISSHPrivateKey, IUsernamePassword
     implements(ICredentialsChecker)
@@ -63,7 +64,7 @@ class MercurialAuthenticationChekers(object):
 
     def checkKey(self, session, credentials):
         user = session.query(db.User).get(credentials.username)
-        log.debug("User %s trying to authenticate" % credentials.username)
+        log.debug("User %s trying to authenticate", credentials.username)
         if not user:
             return False
         for pubKey in user.keys:
@@ -77,7 +78,7 @@ class MercurialAuthenticationChekers(object):
 
     def authenticate(self, session, credentials):
         user = session.query(db.User).get(credentials.username)
-        log.debug("User %s trying to authenticate" % credentials.username)
+        log.debug("User %s trying to authenticate", credentials.username)
         if not user:
             return defer.fail(UnauthorizedLogin("invalid username"))
         log.debug(user.authenticate(credentials.password))

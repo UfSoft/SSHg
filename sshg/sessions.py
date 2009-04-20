@@ -12,14 +12,12 @@
 
 import shlex
 from twisted.conch.manhole_ssh import TerminalSession
-from twisted.conch.ssh import session, channel, common
+from twisted.conch.ssh import session, channel
 from twisted.conch.error import NotEnoughAuthentication
-from twisted.conch.interfaces import ISession
 from twisted.internet import reactor, defer
 from twisted.python import components, log as twlog
 from sshg import logger, database as db
 from sshg.terminal import AdminTerminal
-from sshg.protocol import MercurialSSHSessionProtocol
 
 log = logger.getLogger(__name__)
 
@@ -70,29 +68,14 @@ class FixedSSHSession(session.SSHSession):
             # Only write if we have a transport set up
             self.client.transport.write(data)
 
-    def request_exec(self, data):
-        if not self.session:
-            self.session = ISession(self.avatar)
-        f,data = common.getNS(data)
-        log.debug('executing command "%s"' % f)
-        try:
-            pp = MercurialSSHSessionProtocol(self)
-            self.session.execCommand(pp, f)
-        except:
-            twlog.deferr()
-            return 0
-        else:
-            self.client = pp
-            return 1
-
     def write(self, data):
         self.out_counter += len(data)
         log.debug("Current Out Counter: %s", self.out_counter)
-        channel.SSHChannel.write(self, data)
+        session.SSHSession.write(self, data)
 
     def writeExtended(self, dataType, data):
         log.debug("EXTENDED - Current Out Counter: %s", self.out_counter)
-        channel.SSHChannel.writeExtended(self, dataType, data)
+        session.SSHSession.writeExtended(self, dataType, data)
 
     def _update_database(self, session=None):
         log.debug("Total In Bytes: %s", self.in_counter)
@@ -104,7 +87,6 @@ class FixedSSHSession(session.SSHSession):
             log.error("Could not found repo %r on database", self.reponame)
         repo.size += self.in_counter
         session.commit()
-
 
 
 class MercurialSession(TerminalSession):

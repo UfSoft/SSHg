@@ -18,7 +18,6 @@ from twisted.python import components, log as twlog
 
 from sshg.avatars import MercurialUser, MercurialAdmin
 from sshg.sessions import MercurialSession, MercurialAdminSession
-from sshg.database import User, session
 from sshg import logger, database as db
 
 log = logger.getLogger(__name__)
@@ -39,7 +38,7 @@ class MercurialRepositoriesRealm(TerminalRealm):
             return defer.fail(Exception("User is not known"))
         elif user.locked_out:
             return defer.fail(Exception("User locked out"))
-        elif user.is_admin or user.manages.first():
+        elif user.is_admin or user.manages.count()>0:
             log.debug("User %s is %s", avatarId,
                       user.is_admin and 'admin' or 'manager')
             self.userFactory = MercurialAdmin
