@@ -125,7 +125,7 @@ class Repository(DeclarativeBase):
 #    keys    = db.relation("PublicKey", secondary=repokeys_association,
 #                          backref="repositories")
     users   = db.relation("User", secondary=repousers_association,
-                          backref="repos")
+                          backref=orm.backref("repos", lazy='dynamic'))
     managers = db.relation("User", secondary=repomanagers_association,
                            backref=orm.backref("manages", lazy='dynamic'))
 

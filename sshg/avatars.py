@@ -29,8 +29,6 @@ from sshg.sessions import (MercurialSession, MercurialAdminSession,
 from sshg.sftp import SFTPFileTransfer, FileTransferServer
 from sshg.database import require_session, User, PublicKey
 
-# XXX: Implement username/password authentication too ???
-
 log = logger.getLogger(__name__)
 
 def validPublicKey(public_key_contents):
@@ -155,8 +153,6 @@ class MercurialAdmin(MercurialUser):
     def openShell(self, protocol):
         log.debug("SHELL")
         serverProtocol = insults.ServerProtocol(insults.TerminalProtocol)
-
-        pass
 
 
 

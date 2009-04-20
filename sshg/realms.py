@@ -37,7 +37,9 @@ class MercurialRepositoriesRealm(TerminalRealm):
         user = session.query(db.User).get(avatarId)
         if not user:
             return defer.fail(Exception("User is not known"))
-        if user.is_admin or user.manages.first():
+        elif user.locked_out:
+            return defer.fail(Exception("User locked out"))
+        elif user.is_admin or user.manages.first():
             log.debug("User %s is %s", avatarId,
                       user.is_admin and 'admin' or 'manager')
             self.userFactory = MercurialAdmin
