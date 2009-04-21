@@ -129,19 +129,24 @@ class Repository(DeclarativeBase):
 
     __tablename__ = 'repositories'
 
-    name        = db.Column(db.String, primary_key=True)
-    path        = db.Column(db.String, unique=True)
-    size        = db.Column(db.Integer, default=0)
-    quota       = db.Column(db.Integer, default=0)
-    added_on    = db.Column(db.DateTime, default=datetime.utcnow())
+    name            = db.Column(db.String, primary_key=True)
+    path            = db.Column(db.String, unique=True)
+    size            = db.Column(db.Integer, default=0)
+    quota           = db.Column(db.Integer, default=0)
+    added_on        = db.Column(db.DateTime, default=datetime.utcnow())
+    incoming_quota  = db.Column(db.Integer, default=0)
+    outgoing_quota  = db.Column(db.Integer, default=0)
 
     # Relationships
 #    keys    = db.relation("PublicKey", secondary=repokeys_association,
 #                          backref="repositories")
-    users   = db.relation("User", secondary=repousers_association,
-                          backref=orm.backref("repos", lazy='dynamic'))
+    users    = db.relation("User", secondary=repousers_association,
+                           backref=orm.backref("repos", lazy='dynamic'))
     managers = db.relation("User", secondary=repomanagers_association,
                            backref=orm.backref("manages", lazy='dynamic'))
+    traffic  = db.relation("RepositoryTraffic",
+                           backref=orm.backref("repo", lazy='dynamic'),
+                           cascade="all, delete, delete-orphan")
 
     def __init__(self, name, repo_path, size=0, quota=0):
         self.name = name
@@ -151,12 +156,35 @@ class Repository(DeclarativeBase):
 
     def get_size(self, check=False):
         # For now, just return the database size. At a later stage, calculate it
+        if not check:
+            return self.size
+        dir_size = 0
+        for (path, dirs, files) in os.walk(self.path):
+            for filename in files:
+                filepath = os.path.join(path, filename)
+                dir_size += os.path.getsize(filepath)
+        self.size = dir_size
         return self.size
 
     def __repr__(self):
         return \
         '<Repository Path: "%(path)s"  Size: %(size)s  Quota: %(quota)s>' % \
         self.__dict__
+
+
+class RepositoryTraffic(DeclarativeBase):
+    """Repository Traffic"""
+
+    __tablename__ = 'repository_traffic'
+    stamp    = db.Column(db.DateTime, default=datetime.utcnow(),
+                         primary_key=True)
+    incoming = db.Column(db.Integer, default=0)
+    outgoing = db.Column(db.Integer, default=0)
+    repo_id  = db.Column(db.ForeignKey('repositories.name'))
+
+    def __init__(self, incoming=0, outgoing=0):
+        self.incoming = incoming
+        self.outgoing = outgoing
 
 
 class PublicKey(DeclarativeBase):
