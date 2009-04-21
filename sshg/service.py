@@ -25,12 +25,24 @@ from twisted.plugin import IPlugin
 from twisted.python import usage
 from zope.interface import implements
 
-from sshg import __version__, __summary__, application, config
+
+from sshg import (__version__, __summary__, application, config, database as db,
+                  upgrades)
 from sshg.checkers import MercurialAuthenticationChekers
-from sshg.database import create_engine, metadata, session, User, PublicKey
 from sshg.factories import MercurialReposFactory
 from sshg.portals import MercurialRepositoriesPortal
 from sshg.realms import MercurialRepositoriesRealm
+
+
+try:
+    from migrate.versioning.api import upgrade
+    from migrate.versioning.repository import Repository
+
+    UPGRADES_REPO = Repository(upgrades.__path__[0])
+except ImportError:
+    print "You need the SQLAlchemy-migrate package installed."
+    print "  http://code.google.com/p/sqlalchemy-migrate/"
+    sys.exit(1)
 
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
@@ -92,8 +104,8 @@ class SetupOptions(BaseOptions):
 
 
         print "Creating Database"
-        application.database_engine = create_engine()
-        metadata.create_all(application.database_engine)
+        application.database_engine = db.create_engine()
+        db.metadata.create_all(application.database_engine)
         print "Setup initial username"
         username = raw_input("Username [%s]: " % getpass.getuser())
         if not username:
@@ -108,27 +120,89 @@ class SetupOptions(BaseOptions):
             except PasswordsDoNotMatch:
                 pass
 
-        Session = session()
-        user = User(username, password, is_admin=True)
+        session = db.session()
+        user = db.User(username, password, is_admin=True)
         pubkey_path = raw_input("Path to your public key [~/.ssh/id_rsa.pub]: ")
         if not pubkey_path:
             pubkey_path = expanduser('~/.ssh/id_rsa.pub')
         if not isfile(expanduser(pubkey_path)):
             print "File %r does not exist" % expanduser(pubkey_path)
-        key = PublicKey(open(expanduser(pubkey_path)).read())
+        key = db.PublicKey(open(expanduser(pubkey_path)).read())
         user.keys.append(key)
-        Session.add(user)
-        Session.commit()
+        session.add(user)
+
+        # Setup database schema version control
+        session.add(db.SchemaVersion("SSHg Schema Version Control",
+                                     UPGRADES_REPO.path, UPGRADES_REPO.latest)
+        )
+
+        session.commit()
         print "Done"
         sys.exit()
 
+class UpgradeOptions(BaseOptions):
+    longdesc = "Upgrade SSHg"
 
+    def getService(self):
+        application.database_engine = db.create_engine()
+        session = db.session()
+        if not application.database_engine.has_table(
+                                                db.SchemaVersion.__tablename__):
+            # Too old db schema version, does not even have the control table
+            db.SchemaVersion.__table__.create(bind=application.database_engine)
+
+        if not session.query(db.SchemaVersion).first():
+            # No previously entered record
+            session.add(
+                db.SchemaVersion("SSHg Schema Version Control",
+                                 unicode(UPGRADES_REPO.path), 0)
+            )
+            session.commit()
+
+        schema_version = session.query(db.SchemaVersion).first()
+
+        if schema_version.version >= UPGRADES_REPO.latest:
+            print "No upgrade needed."
+            sys.exit()
+
+        # Do the database upgrade
+        if config.db.engine == 'sqlite':
+            from shutil import copy
+            print "Backup current database:"
+            old_db_path = join(config.db.path, config.db.name)
+            new_db_path = join(config.db.path, '.'.join(
+                [config.db.name, str(UPGRADES_REPO.latest), 'bak'])
+            )
+            print " %s -> %s" % (old_db_path, new_db_path)
+            copy(old_db_path, new_db_path)
+        print "Upgrading..."
+        upgrade(application.database_engine.url, UPGRADES_REPO)
+
+        sys.exit()
 
 class ServiceOptions(BaseOptions):
     longdesc = "Mercurial repositories SSH server"
 
     def getService(self):
-        application.database_engine = create_engine()
+
+        def upgrade_required():
+            print "You need to upgrade your database!"
+            print "Please run the upgrade command"
+            sys.exit(1)
+        application.database_engine = db.create_engine()
+
+        session = db.session()
+        if not application.database_engine.has_table(
+                                                db.SchemaVersion.__tablename__):
+            # Too old db schema version, does not even have the control table
+            upgrade_required()
+        elif not session.query(db.SchemaVersion).first():
+            # Table exists!? Yet, no previously entered record!?
+            upgrade_required()
+
+        schema_version = session.query(db.SchemaVersion).first()
+        if schema_version.version < UPGRADES_REPO.latest:
+            upgrade_required()
 
         realm = MercurialRepositoriesRealm()
         portal = MercurialRepositoriesPortal(realm)
@@ -146,6 +220,7 @@ class SSHgOptions(BaseOptions):
     subCommands = [
         ["setup", None, SetupOptions, SetupOptions.longdesc],
         ["server", None, ServiceOptions, ServiceOptions.longdesc],
+        ["upgrade", None, UpgradeOptions, UpgradeOptions.longdesc],
     ]
     defaultSubCommand = "server"
 

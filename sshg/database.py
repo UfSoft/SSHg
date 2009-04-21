@@ -30,7 +30,6 @@ from twisted.python import log as twlog
 
 log = logger.getLogger(__name__)
 
-
 def get_engine():
     """Return the active database engine (the database engine of the active
     application).  If no application is enabled this has an undefined behavior.
@@ -99,12 +98,27 @@ DeclarativeBase = declarative_base()
 metadata = DeclarativeBase.metadata
 
 
+class SchemaVersion(DeclarativeBase):
+    """SQLAlchemy-Migrate schema version control table."""
+
+    __tablename__   = 'migrate_version'
+    repository_id   = db.Column(db.String(255), primary_key=True)
+    repository_path = db.Column(db.Text)
+    version         = db.Column(db.Integer)
+
+    def __init__(self, repository_id, repository_path, version):
+        self.repository_id = repository_id
+        self.repository_path = repository_path
+        self.version = version
+
+
 repousers_association = db.Table('repositories_users_association', metadata,
     db.Column('user_id', None, db.ForeignKey("repousers.username")),
     db.Column('repo_id', None, db.ForeignKey("repositories.name")),
 )
 
-repomanagers_association = db.Table('repositories_managers_association', metadata,
+repomanagers_association = db.Table(
+    'repositories_managers_association', metadata,
     db.Column('user_id', None, db.ForeignKey("repousers.username")),
     db.Column('repo_id', None, db.ForeignKey("repositories.name")),
 )
