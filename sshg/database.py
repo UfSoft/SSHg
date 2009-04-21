@@ -158,15 +158,6 @@ class Repository(DeclarativeBase):
         '<Repository Path: "%(path)s"  Size: %(size)s  Quota: %(quota)s>' % \
         self.__dict__
 
-#class RepoUsers(DeclarativeBase):
-#
-#    __tablename__ = 'repositories_users_association'
-#
-#    user_id       = db.Column(db.ForeignKey("repousers.username"),
-#                              primary_key=True, backref='assoc'),
-#    repo_id       = db.Column(db.ForeignKey("repositories.name"),
-#                              primary_key=True, backref='assoc'),
-#    is_manager    = db.Column(db.Boolean, default=False)
 
 class PublicKey(DeclarativeBase):
     """Users Public Keys"""
@@ -204,8 +195,6 @@ class User(DeclarativeBase):
     is_admin        = db.Column(db.Boolean, default=False)
 
     # Relationships
-#    repositories    = db.relation("Repository", secondary=repousers_association,
-#                                  backref="users")
     keys            = db.relation("PublicKey", backref="owner",
                                   cascade="all, delete, delete-orphan")
     last_used_key   = db.relation("PublicKey", uselist=False)
@@ -229,12 +218,4 @@ class User(DeclarativeBase):
         return \
         '<User "%(username)s"  Admin: %(is_admin)s  Locked: %(locked_out)s>' % \
         self.__dict__
-
-
-class Session(DeclarativeBase):
-    """Persistent Session Database"""
-    __tablename__ = 'persistent_sessions'
-
-    uid     = db.Column(db.String, primary_key=True)
-    data    = db.Column(db.PickleType)
 

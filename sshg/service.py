@@ -140,8 +140,22 @@ class SetupOptions(BaseOptions):
         print "Done"
         sys.exit()
 
+class MigrateScriptAccess(BaseOptions):
+    longdesc = "SQLAlchemy Migrate Script Access"
+
+    def parseOptions(self, options=None):
+        from migrate.versioning.shell import main
+        # Tweak sys.argv
+        sys.argv = sys.argv[sys.argv.index('migrate'):]
+        main(url=db.create_engine().url, repository=UPGRADES_REPO.path)
+        sys.exit()
+
 class UpgradeOptions(BaseOptions):
     longdesc = "Upgrade SSHg"
+
+    subCommands = [
+        ["migrate", None, MigrateScriptAccess, MigrateScriptAccess.longdesc]
+    ]
 
     def getService(self):
         application.database_engine = db.create_engine()
