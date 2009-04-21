@@ -45,6 +45,7 @@ class FixedSSHSession(session.SSHSession):
     def closed(self):
         log.debug("on closed()")
         if self.reponame:
+
             self.callbacks.addCallback(self._update_database)
             twlog.msg("Running closeReceived() callbacks: %r" %
                       self.callbacks.callbacks)
@@ -85,7 +86,7 @@ class FixedSSHSession(session.SSHSession):
         repo = session.query(db.Repository).get(self.reponame)
         if not repo:
             log.error("Could not found repo %r on database", self.reponame)
-        repo.size += self.in_counter
+        repo.get_size(True)
         session.commit()
 
 
