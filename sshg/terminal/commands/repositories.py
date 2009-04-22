@@ -154,8 +154,7 @@ class RepositoriesCommands(BaseRepositoryCommands):
         if not self.check_perms(session, repo):
             return "%(LR)Error:%(RST)s You don't have the required permissions."
         log.debug(repo)
-        size = repo.get_size()
-        return "Size: %s" % (size==0 and 'unlimited' or size)
+        return "Size: %s" % (repo.size==0 and 'unlimited' or repo.size)
 
     def do_quota(self, reponame, quota=0):
         """Check or set the repository's permitted quota"""

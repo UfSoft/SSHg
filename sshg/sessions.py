@@ -45,53 +45,50 @@ class FixedSSHSession(session.SSHSession):
     def closed(self):
         log.debug("on closed()")
         if self.reponame:
-
             self.callbacks.addCallback(self._update_database)
-            twlog.msg("Running closeReceived() callbacks: %r" %
-                      self.callbacks.callbacks)
-            log.debug("deferred called: %r", self.callbacks.called)
             self.callbacks.addErrback(self._errorCallBack)
             if not self.callbacks.called:
                 self.callbacks.callback(None)
-            log.debug("deferred called: %r %r", self.callbacks.called,
-                      self.callbacks.callbacks)
         session.SSHSession.closed(self)
 
+    @defer.inlineCallbacks
     def dataReceived(self, data):
-        self.in_counter += len(data)
-        log.debug("Current In Counter: %s", self.in_counter)
-        log.debug(id(self))
-        log.debug(self)
+        self.in_counter += yield len(data)
+        yield log.debug("Current In Counter: %s", self.in_counter)
         if not self.client:
-            self.conn.sendClose(self)
-            self.buf += data
+            yield self.conn.sendClose(self)
+            self.buf += yield data
         if self.client.transport:
             # Only write if we have a transport set up
-            self.client.transport.write(data)
+            yield self.client.transport.write(data)
 
+    @defer.inlineCallbacks
     def write(self, data):
-        self.out_counter += len(data)
-        log.debug("Current Out Counter: %s", self.out_counter)
-        session.SSHSession.write(self, data)
+        self.out_counter += yield len(data)
+        yield log.debug("Current Out Counter: %s", self.out_counter)
+        yield session.SSHSession.write(self, data)
 
+    @defer.inlineCallbacks
     def writeExtended(self, dataType, data):
-        log.debug("EXTENDED - Current Out Counter: %s", self.out_counter)
-        session.SSHSession.writeExtended(self, dataType, data)
+        yield log.debug("EXTENDED - Current Out Counter: %s", self.out_counter)
+        yield session.SSHSession.writeExtended(self, dataType, data)
 
-    def _update_database(self, session=None):
-        log.debug("Total In Bytes: %s", self.in_counter)
-        log.debug("Total Out Bytes: %s", self.out_counter)
-        if not session:
-            session = db.session()
+    def _update_database(self, previous_result):
+        session = db.session()
         repo = session.query(db.Repository).get(self.reponame)
         if not repo:
             log.error("Could not found repo %r on database", self.reponame)
-        repo.get_size(True)
-        session.commit()
+        repo.calculate_size()
+        repo.traffic.append(db.RepositoryTraffic(self.in_counter,
+                                                 self.out_counter))
+        try:
+            session.commit()
+        except Exception, err:
+            log.error("Rolling back session: %r", err)
+            session.rollback()
 
 
 class MercurialSession(TerminalSession):
-    #implements(session.ISession)
 
     hg_process_pid = None
 
