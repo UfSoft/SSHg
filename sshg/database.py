@@ -133,13 +133,11 @@ class Repository(DeclarativeBase):
     path            = db.Column(db.String, unique=True)
     size            = db.Column(db.Integer, default=0)
     quota           = db.Column(db.Integer, default=0)
-    added_on        = db.Column(db.DateTime, default=datetime.utcnow())
+    added_on        = db.Column(db.DateTime, default=datetime.utcnow)
     incoming_quota  = db.Column(db.Integer, default=0)
     outgoing_quota  = db.Column(db.Integer, default=0)
 
     # Relationships
-#    keys    = db.relation("PublicKey", secondary=repokeys_association,
-#                          backref="repositories")
     users    = db.relation("User", secondary=repousers_association,
                            backref=orm.backref("repos", lazy='dynamic'))
     managers = db.relation("User", secondary=repomanagers_association,
@@ -148,36 +146,34 @@ class Repository(DeclarativeBase):
                            backref=orm.backref("repo", lazy='dynamic'),
                            cascade="all, delete, delete-orphan")
 
-    def __init__(self, name, repo_path, size=0, quota=0):
+    def __init__(self, name, repo_path, quota=0, incoming_quota=0,
+                 outgoing_quota=0):
         self.name = name
         self.path = repo_path
-        self.size = size
         self.quota = quota
+        self.incoming_quota = incoming_quota
+        self.outgoing_quota = outgoing_quota
+        self.size = self.calculate_size()
 
-    def get_size(self, check=False):
-        # For now, just return the database size. At a later stage, calculate it
-        if not check:
-            return self.size
+    def calculate_size(self):
         dir_size = 0
-        for (path, dirs, files) in os.walk(self.path):
+        for (dirname, _, files) in os.walk(self.path):
             for filename in files:
-                filepath = os.path.join(path, filename)
-                dir_size += os.path.getsize(filepath)
+                filepath = path.join(dirname, filename)
+                dir_size += path.getsize(filepath)
         self.size = dir_size
         return self.size
 
     def __repr__(self):
-        return \
-        '<Repository Path: "%(path)s"  Size: %(size)s  Quota: %(quota)s>' % \
-        self.__dict__
+        return ('<Repository Path: "%(path)s"  Size: %(size)s  '
+                'Quota: %(quota)s>' % self.__dict__)
 
 
 class RepositoryTraffic(DeclarativeBase):
     """Repository Traffic"""
 
     __tablename__ = 'repository_traffic'
-    stamp    = db.Column(db.DateTime, default=datetime.utcnow(),
-                         primary_key=True)
+    stamp    = db.Column(db.DateTime, default=datetime.utcnow, primary_key=True)
     incoming = db.Column(db.Integer, default=0)
     outgoing = db.Column(db.Integer, default=0)
     repo_id  = db.Column(db.ForeignKey('repositories.name'))
@@ -193,8 +189,8 @@ class PublicKey(DeclarativeBase):
     __tablename__ = 'pubkeys'
 
     key         = db.Column(db.String, primary_key=True)
-    added_on    = db.Column(db.DateTime, default=datetime.utcnow())
-    used_on     = db.Column(db.DateTime, default=datetime.utcnow())
+    added_on    = db.Column(db.DateTime, default=datetime.utcnow)
+    used_on     = db.Column(db.DateTime, default=datetime.utcnow)
     user_id     = db.Column(db.ForeignKey('repousers.username'))
 
 #    # Many to Many Relation set elsewere
@@ -217,8 +213,8 @@ class User(DeclarativeBase):
 
     username        = db.Column(db.String, primary_key=True)
     password        = db.Column(db.String)
-    added_on        = db.Column(db.DateTime, default=datetime.utcnow())
-    last_login      = db.Column(db.DateTime, default=datetime.utcnow())
+    added_on        = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login      = db.Column(db.DateTime, default=datetime.utcnow)
     locked_out      = db.Column(db.Boolean, default=False)
     is_admin        = db.Column(db.Boolean, default=False)
 
@@ -243,7 +239,6 @@ class User(DeclarativeBase):
         self.password = gen_pwhash(password)
 
     def __repr__(self):
-        return \
-        '<User "%(username)s"  Admin: %(is_admin)s  Locked: %(locked_out)s>' % \
-        self.__dict__
+        return ('<User "%(username)s"  Admin: %(is_admin)s  '
+                'Locked: %(locked_out)s>' % self.__dict__)
 
