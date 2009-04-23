@@ -1,3 +1,4 @@
+migrate_engine = object     # Make PyDev Happy
 from sshg.upgrades.versions import *
 
 DeclarativeBase = declarative_base()

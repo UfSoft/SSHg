@@ -13,6 +13,7 @@
 import shlex
 from twisted.conch.manhole_ssh import TerminalSession
 from twisted.conch.ssh import session, channel
+from twisted.conch.ssh.connection import EXTENDED_DATA_STDERR
 from twisted.conch.error import NotEnoughAuthentication
 from twisted.internet import reactor, defer
 from twisted.python import components, log as twlog
@@ -20,6 +21,9 @@ from sshg import logger, database as db
 from sshg.terminal import AdminTerminal
 
 log = logger.getLogger(__name__)
+
+class StopProcessing(Exception):
+    """Exception for when we prohibit something"""
 
 class FixedSSHSession(session.SSHSession):
     in_counter = 0
@@ -29,6 +33,10 @@ class FixedSSHSession(session.SSHSession):
     callbacks = defer.Deferred()
 
     def _errorCallBack(self, failure):
+        if failure.check(StopProcessing):
+            self.writeExtended(EXTENDED_DATA_STDERR, "FOO")
+            self.loseConnection()
+            return
         log.exception(failure)
 
     def loseConnection(self):
@@ -65,12 +73,13 @@ class FixedSSHSession(session.SSHSession):
     @defer.inlineCallbacks
     def write(self, data):
         self.out_counter += yield len(data)
-        yield log.debug("Current Out Counter: %s", self.out_counter)
+#        yield log.debug("Current Out Counter: %s", self.out_counter)
         yield session.SSHSession.write(self, data)
 
     @defer.inlineCallbacks
     def writeExtended(self, dataType, data):
-        yield log.debug("EXTENDED - Current Out Counter: %s", self.out_counter)
+        yield log.debug("EXTENDED - Current Out Counter: %s  DataType: %r  "
+                        "Data: %r", self.out_counter, dataType, data)
         yield session.SSHSession.writeExtended(self, dataType, data)
 
     def _update_database(self, previous_result):
@@ -118,8 +127,7 @@ class MercurialSession(TerminalSession):
         if args.pop(0) != 'hg':
             log.warning("User %s trying to run a command(%s) other than a "
                         "mercurial repository", self.avatar.username, cmd)
-            protocol.loseConnection()
-            raise NotEnoughAuthentication
+            raise StopProcessing("Command not allowed!")
 
         # Discard -R
         args.pop(0)
@@ -140,9 +148,14 @@ class MercurialSession(TerminalSession):
 
         if not repo:
             log.error("Repository %s not found!", repository_name)
-            raise NotEnoughAuthentication("Repository not found")
+            raise StopProcessing("Repository not found!")
 
         log.debug("Got Repository: %r", repo)
+
+        if repo.size > repo.quota:
+            from twisted.conch.ssh import connection
+            log.error("Repository %s over quota.", repo.name)
+            raise StopProcessing("Repository over quota.")
 
         # Set repository name in ssh's session channel so that
         # database updates can occur
@@ -156,8 +169,6 @@ class MercurialSession(TerminalSession):
 
         log.debug("Are there any args left? %s", args)
 
-        repository_path = str(repo.path)
-
         process_args = ['hg', '-R', repository_path, serve, stdio]
         #process_args.append('--debug')
 
@@ -166,15 +177,21 @@ class MercurialSession(TerminalSession):
             executable='hg', args=process_args,
             path=repository_path
         )
-#         Above, one could try instead to open the mercurial repository
-#         ourselves and pipe data back and forth, but, twisted can do that
-#         for us ;)
+        # Above, one could try instead to open the mercurial repository
+        # ourselves and pipe data back and forth, but, twisted can do that
+        # for us :)
+        # I think I should let this for mercurial itself, whenever mercurial
+        # changed it's sshserver code, we would have to change the twisted
+        # protocol implementing it
+
 
     def _ebExecCommand(self, failure, protocol):
-        try:
-            twlog.err()
-        except:
-            log.exception(failure)
+        if failure.check(StopProcessing):
+            message = "SSHg -> %s\n\r" % failure.value.message.strip()
+            protocol.session.writeExtended(EXTENDED_DATA_STDERR, message)
+            protocol.loseConnection()
+            return
+        log.exception(failure)
 
     def eofReceived(self):
         if self.hg_process_pid:
