@@ -153,7 +153,6 @@ class MercurialSession(TerminalSession):
         log.debug("Got Repository: %r", repo)
 
         if repo.size > repo.quota:
-            from twisted.conch.ssh import connection
             log.error("Repository %s over quota.", repo.name)
             raise StopProcessing("Repository over quota.")
 
@@ -169,6 +168,7 @@ class MercurialSession(TerminalSession):
 
         log.debug("Are there any args left? %s", args)
 
+        repository_path = str(repo.path)
         process_args = ['hg', '-R', repository_path, serve, stdio]
         #process_args.append('--debug')
 
