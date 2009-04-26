@@ -165,8 +165,8 @@ class MercurialSession(TerminalSession):
         serve = args.pop(0)
         stdio = args.pop(0)
         if serve != 'serve' or stdio != '--stdio':
-            # Client is not trying to run an HG repository
-            raise NotEnoughAuthentication("Repository not found")
+            # Client is not trying to run an HG repository through ssh
+            raise StopProcessing("StopProcessing")
 
         log.debug("Are there any args left? %s", args)
 
@@ -174,13 +174,20 @@ class MercurialSession(TerminalSession):
         process_args = ['hg', '-R', repository_path, serve, stdio]
         #process_args.append('--debug')
 
+        rules = repo.rules.filter(db.AclRule.user==user).all()
+
+        log.debug('Rules: %r', rules)
+        source = [entry.sources for entry in rules if entry.sources]
+        allow = [entry.allow for entry in rules if entry.allow]
+        deny = [entry.deny for entry in rules if entry.deny]
+        log.debug('SOURCE: %r  Allow: %r  Deny: %r', source, allow, deny)
         self.hg_process_pid = reactor.spawnProcess(
             processProtocol=protocol,
             executable='hg', args=process_args,
             path=repository_path,
-            env = {'SSHg.ALLOW': simplejson.dumps([]),
-                   'SSHg.DENY': simplejson.dumps([]),
-                   'SSHg.SOURCES': simplejson.dumps([]),
+            env = {'SSHg.ALLOW': simplejson.dumps(allow),
+                   'SSHg.DENY': simplejson.dumps(deny),
+                   'SSHg.SOURCES': simplejson.dumps(source),
                    'SSHg.USERNAME': self.avatar.username,
                    'PATH': environ.get('PATH')
             }
@@ -200,6 +207,7 @@ class MercurialSession(TerminalSession):
             protocol.loseConnection()
             return
         log.exception(failure)
+        protocol.loseConnection()
 
     def eofReceived(self):
         if self.hg_process_pid:

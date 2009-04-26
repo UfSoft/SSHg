@@ -24,17 +24,17 @@ def hook(ui, repo, hooktype, node=None, source=None, **kwargs):
         raise util.Abort(_('config error - hook type "%s" cannot stop '
                            'incoming changesets') % hooktype)
 
-    print '\n\n\n', repo
-    print environ.get('SSHg.USERNAME', None)
-    print simplejson.loads(environ.get('SSHg.ALLOW', None))
-    print simplejson.loads(environ.get('SSHg.DENY', None))
-    print source
+#    print '\n\n\n', repo
+#    print environ.get('SSHg.USERNAME', None)
+#    print simplejson.loads(environ.get('SSHg.ALLOW', None))
+#    print simplejson.loads(environ.get('SSHg.DENY', None))
+#    print source
 
     # Who's pushing
     allow_rules = environ.get('SSHg.ALLOW', None)
     deny_rules = environ.get('SSHg.DENY', None)
     username = environ.get('SSHg.USERNAME', None)
-    source_rules = environ.get('SSHg.SOURCE', None)
+    source_rules = environ.get('SSHg.SOURCES', None)
     if not allow_rules or not deny_rules or not source_rules or not username:
         raise util.Abort("Something's wrong with your setup. At least one of "
                          "the necessary environment keys is not present.")
@@ -49,7 +49,8 @@ def hook(ui, repo, hooktype, node=None, source=None, **kwargs):
     allow = buildmatch(ui, repo, username, simplejson.loads(allow_rules))
     deny = buildmatch(ui, repo, username, simplejson.loads(deny_rules))
 
-    raise util.Abort("I just need to stop this")
+#    raise util.Abort("I just need to stop this")
+
     # Check Them!
     for rev in xrange(repo[node], len(repo)):
         ctx = repo[rev]
