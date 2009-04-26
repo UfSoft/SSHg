@@ -41,11 +41,12 @@ class AclRule(DeclarativeBase):
     __tablename__ = 'acl_rules'
 
     id      = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    user_id = db.Column(db.ForeignKey('repousers.username'))
-    repo_id = db.Column(db.ForeignKey('repositories.name'))
+    order   = db.Column(db.Integer, default=0)
     sources = db.Column(db.String)
     allow   = db.Column(db.String)
     deny    = db.Column(db.String)
+    user_id = db.Column(db.ForeignKey('repousers.username'))
+    repo_id = db.Column(db.ForeignKey('repositories.name'))
 
 def upgrade():
     # Upgrade operations go here. Don't create your own engine; use the engine
