@@ -19,37 +19,11 @@ setup(name=sshg.__package__,
       description=sshg.__summary__,
       long_description=sshg.__description__,
       license=sshg.__license__,
-      platforms="OS Independent - Anywhere Python and ISPMan is known to run.",
-      install_requires = ['Babel'],
-      keywords = "ISPMan Control Panel",
+      platforms="OS Independent - Anywhere Twisted and Mercurial is known to run.",
+      keywords = "Twisted Mercurial SSH ACL HG",
       packages=['sshg'],
-#      package_data={
-#        'tracext.dm': [
-#            'templates/*.html',
-#            'htdocs/css/*.css',
-#            'htdocs/img/*.png',
-#            'htdocs/img/*.gif',
-#            'htdocs/js/*.js',
-#        ]
-#      },
-      message_extractors = {
-        'sshg': [
-            ('**.py', 'python', None)
-        ],
-        'flex': [
-            ('**.as', 'sshg.utils.translations:extract_actionscript', None),
-            ('**.mxml', 'sshg.utils.translations:extract_mxml', {
-                'attrs': [
-                    u'label', u'text', u'title', u'headerText', u'prompt']}),
-        ]
-      },
-      entry_points = {
-        'distutils.commands': [
-            'extract = babel.messages.frontend:extract_messages',
-            'init = babel.messages.frontend:init_catalog',
-            'compile = babel.messages.frontend:compile_catalog',
-            'update = babel.messages.frontend:update_catalog'
-        ]
+      package_data={
+          'sshg': ['upgrades/*.cfg']
       },
       classifiers=[
           'Development Status :: 5 - Alpha',

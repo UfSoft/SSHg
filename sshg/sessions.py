@@ -11,12 +11,14 @@
 """
 
 import shlex
+import simplejson
+from os import environ
 from twisted.conch.manhole_ssh import TerminalSession
 from twisted.conch.ssh import session, channel
 from twisted.conch.ssh.connection import EXTENDED_DATA_STDERR
 from twisted.conch.error import NotEnoughAuthentication
 from twisted.internet import reactor, defer
-from twisted.python import components, log as twlog
+from twisted.python import components
 from sshg import logger, database as db
 from sshg.terminal import AdminTerminal
 
@@ -175,7 +177,13 @@ class MercurialSession(TerminalSession):
         self.hg_process_pid = reactor.spawnProcess(
             processProtocol=protocol,
             executable='hg', args=process_args,
-            path=repository_path
+            path=repository_path,
+            env = {'SSHg.ALLOW': simplejson.dumps([]),
+                   'SSHg.DENY': simplejson.dumps([]),
+                   'SSHg.SOURCES': simplejson.dumps([]),
+                   'SSHg.USERNAME': self.avatar.username,
+                   'PATH': environ.get('PATH')
+            }
         )
         # Above, one could try instead to open the mercurial repository
         # ourselves and pipe data back and forth, but, twisted can do that

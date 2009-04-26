@@ -6,3 +6,4 @@ twistd.*
 **/dropin.cache
 **/*.mo
 flex/deploy
+TestProject/**/*

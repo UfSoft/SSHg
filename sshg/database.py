@@ -145,6 +145,8 @@ class Repository(DeclarativeBase):
     traffic  = db.relation("RepositoryTraffic",
                            backref=orm.backref("repo", lazy='dynamic'),
                            cascade="all, delete, delete-orphan")
+    rules    = db.relation("ACLRules", backref="repo", lazy='dynamic',
+                           cascade="all, delete, delete-orphan")
 
     def __init__(self, name, repo_path, quota=0, incoming_quota=0,
                  outgoing_quota=0):
@@ -222,6 +224,8 @@ class User(DeclarativeBase):
     keys            = db.relation("PublicKey", backref="owner",
                                   cascade="all, delete, delete-orphan")
     last_used_key   = db.relation("PublicKey", uselist=False)
+    rules           = db.relation("ACLRules", backref="user", lazy='dynamic',
+                                  cascade="all, delete, delete-orphan")
 
 
     def __init__(self, username, password, is_admin=False):
@@ -241,4 +245,14 @@ class User(DeclarativeBase):
     def __repr__(self):
         return ('<User "%(username)s"  Admin: %(is_admin)s  '
                 'Locked: %(locked_out)s>' % self.__dict__)
+
+class ACLRules(DeclarativeBase):
+    __tablename__ = 'acl_rules'
+
+    id      = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.ForeignKey('repousers.username'))
+    repo_id = db.Column(db.ForeignKey('repositories.name'))
+    sources = db.Column(db.String)
+    allow   = db.Column(db.String)
+    deny    = db.Column(db.String)
 

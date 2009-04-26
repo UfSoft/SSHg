@@ -40,9 +40,14 @@ try:
 
     UPGRADES_REPO = Repository(upgrades.__path__[0])
 except ImportError:
-    print "You need the SQLAlchemy-migrate package installed."
-    print "  http://code.google.com/p/sqlalchemy-migrate/"
-    sys.exit(1)
+    upgrade = UPGRADES_REPO = None
+
+def required_imports_ok():
+    if not upgrade or not UPGRADES_REPO:
+        print "You need the SQLAlchemy-migrate package installed."
+        print "  http://code.google.com/p/sqlalchemy-migrate/"
+        return False
+    return True
 
 class PasswordsDoNotMatch(Exception):
     """Simple exception to catch non-matching passwords"""
@@ -132,6 +137,8 @@ class SetupOptions(BaseOptions):
         session.add(user)
 
         # Setup database schema version control
+        if not required_imports_ok():
+            sys.exit(1)
         session.add(db.SchemaVersion("SSHg Schema Version Control",
                                      UPGRADES_REPO.path, UPGRADES_REPO.latest)
         )
@@ -144,6 +151,8 @@ class MigrateScriptAccess(BaseOptions):
     longdesc = "SQLAlchemy Migrate Script Access"
 
     def parseOptions(self, options=None):
+        if not required_imports_ok():
+            sys.exit(1)
         from migrate.versioning.shell import main
         # Tweak sys.argv
         sys.argv = sys.argv[sys.argv.index('migrate'):]
@@ -158,6 +167,8 @@ class UpgradeOptions(BaseOptions):
     ]
 
     def getService(self):
+        if not required_imports_ok():
+            sys.exit(1)
         application.database_engine = db.create_engine()
         session = db.session()
         if not application.database_engine.has_table(
@@ -214,9 +225,10 @@ class ServiceOptions(BaseOptions):
             # Table exists!? Yet, no previously entered record!?
             upgrade_required()
 
-        schema_version = session.query(db.SchemaVersion).first()
-        if schema_version.version < UPGRADES_REPO.latest:
-            upgrade_required()
+        if required_imports_ok():
+            schema_version = session.query(db.SchemaVersion).first()
+            if schema_version.version < UPGRADES_REPO.latest:
+                upgrade_required()
 
         realm = MercurialRepositoriesRealm()
         portal = MercurialRepositoriesPortal(realm)
