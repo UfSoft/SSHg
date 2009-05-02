@@ -38,7 +38,7 @@ class MercurialRepositoriesRealm(TerminalRealm):
             return defer.fail(Exception("User is not known"))
         elif user.locked_out:
             return defer.fail(Exception("User locked out"))
-        elif user.is_admin or user.manages.count()>0:
+        elif user.is_manager:
             log.debug("User %s is %s", avatarId,
                       user.is_admin and 'admin' or 'manager')
             self.userFactory = MercurialAdmin

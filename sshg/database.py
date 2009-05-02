@@ -16,6 +16,7 @@ import sys
 from os import path
 from datetime import datetime
 from types import ModuleType
+from uuid import uuid4
 
 import sqlalchemy
 from sqlalchemy import orm
@@ -195,11 +196,13 @@ class PublicKey(DeclarativeBase):
     used_on     = db.Column(db.DateTime, default=datetime.utcnow)
     user_id     = db.Column(db.ForeignKey('repousers.username'))
 
-#    # Many to Many Relation set elsewere
-#    repositories = None
+    # Relationships defined on other classes
+    owner = None
 
     def __init__(self, key_contents):
         self.key = Key.fromString(key_contents).toString("OPENSSH")
+        if not self.key:
+            raise Exception("Invalid Key")
 
     def update_stamp(self):
         self.used_on = datetime.utcnow()
@@ -214,11 +217,14 @@ class User(DeclarativeBase):
     __tablename__ = 'repousers'
 
     username        = db.Column(db.String, primary_key=True)
+    uuid            = db.Column(db.String(32), default=lambda: uuid4().hex)
+    email           = db.Column(db.String)
     password        = db.Column(db.String)
     added_on        = db.Column(db.DateTime, default=datetime.utcnow)
     last_login      = db.Column(db.DateTime, default=datetime.utcnow)
     locked_out      = db.Column(db.Boolean, default=False)
     is_admin        = db.Column(db.Boolean, default=False)
+    confirmed       = db.Column(db.Boolean, default=False)
 
     # Relationships
     keys            = db.relation("PublicKey", backref="owner",
@@ -226,6 +232,14 @@ class User(DeclarativeBase):
     last_used_key   = db.relation("PublicKey", uselist=False)
     rules           = db.relation("AclRule", backref="user", lazy='dynamic',
                                   cascade="all, delete, delete-orphan")
+    session         = db.relation("Session", lazy=True, uselist=False,
+                                  backref=db.backref('user', uselist=False),
+                                  cascade="all, delete, delete-orphan")
+    changes         = db.relation("Change", backref='owner', lazy='dynamic',
+                                  cascade="all, delete, delete-orphan")
+
+    # Relationships defined on other classes
+    manages = None
 
 
     def __init__(self, username, password, is_admin=False):
@@ -246,6 +260,40 @@ class User(DeclarativeBase):
         return ('<User "%(username)s"  Admin: %(is_admin)s  '
                 'Locked: %(locked_out)s>' % self.__dict__)
 
+    @property
+    def is_manager(self):
+        if self.is_admin:
+            return True
+        return self.manages.count() > 0
+
+class Change(DeclarativeBase):
+    __tablename__ = 'user_changes'
+
+    hash        = db.Column('id', db.String(32), primary_key=True)
+    name        = db.Column(db.String)
+    value       = db.Column(db.String)
+    created     = db.Column(db.DateTime, default=datetime.utcnow)
+    owner_uid   = db.Column(None, db.ForeignKey('repousers.username'))
+
+    # ForeignKey Association
+    owner = None # Defined on User.changes
+
+    def __init__(self, name=None, value=None):
+        self.hash = uuid4().hex
+        self.name = name
+        self.value = value
+
+    def __url__(self, include_hash=True, **kwargs):
+        from sshg.web.utils import url_for
+        return url_for('account.confirm',
+                       confirm_hash=include_hash and self.hash or None,
+                       **kwargs)
+
+    def __repr__(self):
+        return '<UserChange name:"%s" value:"%s" dated %s>' % (self.name,
+                                                               self.value,
+                                                               self.created)
+
 class AclRule(DeclarativeBase):
     __tablename__ = 'acl_rules'
 
@@ -257,3 +305,15 @@ class AclRule(DeclarativeBase):
     user_id = db.Column(db.ForeignKey('repousers.username'))
     repo_id = db.Column(db.ForeignKey('repositories.name'))
 
+
+class Session(DeclarativeBase):
+    __tablename__ = 'session'
+
+    user_uuid       = db.Column(db.ForeignKey('repousers.uuid'),
+                                primary_key=True)
+    last_visit      = db.Column(db.DateTime, default=datetime.utcnow)
+    language        = db.Column(db.String(5), default='en_US')
+    datetime_format = db.Column(db.String(25), default='%Y-%m-%d %H:%M:%S')
+
+    def update_last_visit(self):
+        self.last_visit = datetime.utcnow()

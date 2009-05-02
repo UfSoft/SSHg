@@ -12,8 +12,9 @@
 """
 
 import sys
-from ConfigParser import SafeConfigParser
+from ConfigParser import SafeConfigParser, NoSectionError
 import getpass
+from datetime import datetime, timedelta
 from os import makedirs
 from os.path import abspath, basename, expanduser, isdir, isfile, join
 from types import ModuleType
@@ -23,15 +24,21 @@ from twisted.application.service import (IServiceMaker, Application,
                                          IServiceCollection)
 from twisted.plugin import IPlugin
 from twisted.python import usage
+from twisted.internet import reactor, task
+from twisted.web import server, wsgi
+from twisted.python.threadpool import ThreadPool
 from zope.interface import implements
 
 
 from sshg import (__version__, __summary__, application, config, database as db,
-                  upgrades)
+                  upgrades, logger)
 from sshg.checkers import MercurialAuthenticationChekers
 from sshg.factories import MercurialReposFactory
+from sshg.notification import NotificationSystem
 from sshg.portals import MercurialRepositoriesPortal
+from sshg.utils.crypto import gen_secret_key
 from sshg.realms import MercurialRepositoriesRealm
+from sshg.web.wsgi import WSGIApplication
 
 
 try:
@@ -41,6 +48,8 @@ try:
     UPGRADES_REPO = Repository(upgrades.__path__[0])
 except ImportError:
     upgrade = UPGRADES_REPO = None
+
+log = logger.getLogger(__name__)
 
 def required_imports_ok():
     if not upgrade or not UPGRADES_REPO:
@@ -106,6 +115,23 @@ class SetupOptions(BaseOptions):
 
             print "You can provide your own private key."
             print "Just point to the correct paths on the configuration file."
+            print
+            print "Generating configuration server SSL certificate"
+            cert = crypto.X509()
+            subject = cert.get_subject()
+            subject.CN = 'SSHg Configuration Server'
+            cert.set_pubkey(privateKey)
+            cert.set_serial_number(1)
+            cert.gmtime_adj_notBefore(0)
+            cert.gmtime_adj_notAfter(60 * 60 * 24 * 365 * 5) # Five Years
+            cert.set_issuer(subject)
+            cert.sign(privateKey, "md5")
+            certData = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+            open(join(config.dir, 'certificate.pem'), 'w').write(certData)
+            print "Done. This certificate is valid for 5 years."
+            print "You can provide your own private key/certificate,"
+            print "just point to the correct paths on the configuration file."
+            print
 
 
         print "Creating Database"
@@ -261,6 +287,8 @@ class SSHgOptions(BaseOptions):
 
         if not isfile(configfile):
             print "Creating configuration file with defaults: %r" % configfile
+
+            # Main Server Options
             parser.add_section('main')
             parser.set('main', 'port', '22')
             parser.set('main', 'private_key', '%(here)s/privatekey.pem')
@@ -273,6 +301,7 @@ class SSHgOptions(BaseOptions):
                     "Type ? for help."
                 )
 
+            # Database Options
             parser.add_section('database')
             parser.set('database', 'echo', 'false')
             parser.set('database', 'engine', 'sqlite')
@@ -280,6 +309,30 @@ class SSHgOptions(BaseOptions):
             parser.set('database', 'password', '')
             parser.set('database', 'name', 'database.db')
             parser.set('database', 'path', '%(here)s')
+
+            # Web Admin Options
+            import string
+            from random import choice
+            parser.add_section("web")
+            parser.set('web', 'port', '8443')
+            parser.set('web', 'certificate', '%(here)s/certificate.pem')
+            parser.set('web', 'cookie_name', 'SSHg')
+            parser.set('web', 'secret_key', gen_secret_key())
+            parser.set('web', 'min_threads', '5')
+            parser.set('web', 'max_threads', '25')
+
+            # Notification Settings
+            parser.add_section('notification')
+            parser.set('notification', 'enabled', 'true')
+            parser.set('notification', 'smtp_server', '')
+            parser.set('notification', 'smtp_port', '25')
+            parser.set('notification', 'smtp_user', '')
+            parser.set('notification', 'smtp_pass', '')
+            parser.set('notification', 'smtp_from', '')
+            parser.set('notification', 'from_name', 'SSHg')
+            parser.set('notification', 'reply_to', '')
+            parser.set('notification', 'use_tls', 'false')
+
             parser.write(open(configfile, 'w'))
             print "Please check configuration and run the setup command again"
             sys.exit(0)
@@ -288,6 +341,9 @@ class SSHgOptions(BaseOptions):
         parser.set('DEFAULT', 'here', configdir)
 
         config.dir = configdir
+        config.file = configfile
+        config.parser = parser
+
         config.port = parser.getint('main', 'port')
         config.private_key = abspath(parser.get('main', 'private_key'))
 
@@ -310,6 +366,38 @@ class SSHgOptions(BaseOptions):
         config.db.password = parser.get('database', 'password')
         config.db.name = parser.get('database', 'name')
 
+        try:
+            config.web = ModuleType('config.web')
+            config.web.port = parser.getint('web', 'port')
+            config.web.certificate = abspath(parser.get('web', 'certificate'))
+            config.web.cookie_name = parser.get('web', 'cookie_name')
+            config.web.secret_key = parser.get('web', 'secret_key', raw=True)
+            config.web.min_threads = parser.getint('web', 'min_threads')
+            config.web.max_threads = parser.getint('web', 'max_threads')
+            config.notification = ModuleType('config.notification')
+            config.notification.enabled = parser.getboolean('notification',
+                                                            'enabled')
+            config.notification.smtp_server = parser.get('notification',
+                                                         'smtp_server')
+            config.notification.smtp_port = parser.getint('notification',
+                                                          'smtp_port')
+            config.notification.smtp_user = parser.get('notification',
+                                                       'smtp_user')
+            config.notification.smtp_pass = parser.get('notification',
+                                                       'smtp_pass')
+            config.notification.smtp_from = parser.get('notification',
+                                                       'smtp_from')
+            config.notification.from_name = parser.get('notification',
+                                                       'from_name')
+            config.notification.reply_to =  parser.get('notification',
+                                                       'reply_to')
+            config.notification.use_tls = parser.getboolean('notification',
+                                                            'use_tls')
+            application.notification = NotificationSystem()
+        except NoSectionError:
+            print "You will need to upgrade... Are you upgrading?"
+
+
 
     def postOptions(self):
         if not self.opts.get('config-dir'):
@@ -327,10 +415,48 @@ class SSHgService(object):
     description = __summary__
     options = SSHgOptions
 
+    def __clean_old_changes_from_db(self):
+        session = db.session()
+        expired = session.query(db.Change).filter(
+            db.Change.created<datetime.utcnow()-timedelta(days=1)
+        )
+        log.debug("Expired User Changes: %r", expired.all())
+        for entry in expired.all():
+            log.debug("Cleaning up expired %r", entry)
+            session.delete(entry)
+        session.commit()
+
     def makeService(self, options):
         app = Application("Mercurial SSH Server") #, uid, gid)
         services = IServiceCollection(app)
         service = options.subOptions.getService()
         service.setServiceParent(services)
+
+
+        wsgi_app = WSGIApplication()
+        threadpool = ThreadPool(config.web.min_threads, config.web.max_threads)
+        threadpool.start()
+        reactor.addSystemEventTrigger('after', 'shutdown', threadpool.stop)
+        root = wsgi.WSGIResource(reactor, threadpool, wsgi_app)
+        factory = server.Site(root)
+        if isfile(config.web.certificate):
+            from OpenSSL import SSL
+            # Run SSL Server
+            class SSLContext(object):
+                def getContext(self):
+                    ctx = SSL.Context(SSL.SSLv23_METHOD)
+                    ctx.use_privatekey_file(config.private_key)
+                    ctx.use_certificate_file(config.web.certificate)
+                    return ctx
+            config_service = internet.SSLServer(config.web.port, factory,
+                                                SSLContext())
+        else:
+            config_service = internet.TCPServer(config.web.port, factory)
+        config_service.setServiceParent(app)
+
+        clean_changes_task = task.LoopingCall(self.__clean_old_changes_from_db)
+        clean_changes_task.start(5*60, now=True) # Every 5 minutes
+        reactor.addSystemEventTrigger('after', 'shutdown',
+                                      clean_changes_task.stop)
         return services
 

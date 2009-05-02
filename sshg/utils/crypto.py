@@ -10,7 +10,7 @@ from random import choice
 from hashlib import sha1, md5
 
 SALT_CHARS = string.ascii_lowercase + string.digits
-#SECRET_KEY_CHARS = string.ascii_letters + string.digits + string.punctuation
+SECRET_KEY_CHARS = string.ascii_letters + string.digits + string.punctuation
 
 def gen_salt(length=6):
     """Generate a random string of SALT_CHARS with specified ``length``."""
@@ -18,9 +18,9 @@ def gen_salt(length=6):
         raise ValueError('requested salt of length <= 0')
     return ''.join(choice(SALT_CHARS) for _ in xrange(length))
 
-#def gen_secret_key():
-#    """Generate a new secret key."""
-#    return ''.join(choice(SECRET_KEY_CHARS) for _ in xrange(64))
+def gen_secret_key():
+    """Generate a new secret key."""
+    return ''.join(choice(SECRET_KEY_CHARS) for _ in xrange(64))
 
 def gen_pwhash(password):
     """Return a the password encrypted in sha format with a random salt."""

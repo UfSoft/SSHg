@@ -1,0 +1,92 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <title>Preferences</title>
+    <script type="text/javascript" src="${shared_url('js/jquery.js')}" />
+    <script type="text/javascript" src="${shared_url('js/jquery.checkbox.js')}" />
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>Tweak Your Preferences</legend>
+      <form  action="" method="POST">
+        <table>
+          <tr>
+            <th>Username:</th>
+            <td>${ user.username }</td>
+          </tr>
+          <tr>
+            <th><label for="email">Email:</label></th>
+            <td>
+              <input type="text" name="email" value="${ user.email }"/>
+            </td>
+          </tr>
+          <tr>
+            <th><label for="password">Password:</label></th>
+            <td><input type="password" name="password"/></td>
+          </tr>
+          <tr>
+            <th><label for="password_confirm">Confirm Password:</label></th>
+            <td><input type="password" name="password_confirm"/></td>
+          </tr>
+            <th><label for="datetime_format">Datetime Format:</label></th>
+            <td><input type="text" name="datetime_format" disabled="disabled"
+                       value="${ request.user.session.datetime_format }"/></td>
+          <tr>
+            <th><label for="language">Language:</label></th>
+            <td><input type="text" name="language" disabled="disabled"
+                       value="${ request.user.session.language }"/></td>
+          </tr>
+          <tr>
+            <th><label for="keys">Public Key(s):</label></th>
+            <td>
+              <table class="listing">
+                <thead>
+                  <tr class="header">
+                    <th class="sel">&nbsp;</th>
+                    <th id="td_width">Public Key(s)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr py:for="key in user.keys">
+                    <td class="sel" width="1%">
+                      <input type="checkbox" name="sel" value="$key.key"/>
+                    </td>
+                    <td width="100%"><div class="pubkey">$key.key</div></td>
+                  </tr>
+                </tbody>
+                <thead>
+                  <tr class="header">
+                    <th colspan="2">Add Public Key(s) (one per line)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td colspan="2">
+                      <textarea name="new_keys" rows="3" cols="100"></textarea>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </table>
+        <div class="buttons">
+          <input type="submit" name="update" value="Update"/>
+          <input type="submit" name="delete_keys" value="Delete Selected Public Keys"/>
+        </div>
+      </form>
+    </fieldset>
+    <script type="text/javascript">
+      $(document).ready( function() {
+        $('textarea').each(function() {
+          $(this).width($(this).parent().width());
+        });
+        $('div.pubkey').each(function() {
+          $(this).width($(this).parent().width());
+        });
+      });
+    </script>
+  </body>
+</html>

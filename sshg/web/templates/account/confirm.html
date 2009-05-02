@@ -1,0 +1,26 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <title>Confirm Change</title>
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>Confirm Change</legend>
+      <form  action="" method="POST">
+        <table>
+          <tr>
+            <th><label for="confirm_hash">Hash:</label></th>
+            <td>
+              <input type="text" name="confirm_hash"/>
+            </td>
+          </tr>
+        </table>
+        <div class="buttons" style="">
+          <input type="submit" name="report" value="Confirm"/>
+        </div>
+      </form>
+    </fieldset>
+  </body>
+</html>

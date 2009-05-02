@@ -1,0 +1,60 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/" py:strip="">
+  <py:match path="head" once="false">
+    <head py:attrs="select('@*')">
+      <title py:with="title = list(select('title/text()'))"><py:if
+             test="title">${title} — </py:if>SSHg</title>
+      <link rel="stylesheet" type="text/css"
+            href="${shared_url('style.css')}" />
+      ${select('*[local-name()!="title"]')}
+    </head>
+  </py:match>
+  <py:def function="navigation(endpoint, title, first=False, **kwargs)"
+          py:with="match = request.endpoint==endpoint">
+
+    <li class="${first and 'first' or None} ${match and 'active' or None}">
+      <a href="${ url_for(endpoint, **kwargs) }" py:strip="match">${ title }</a>
+    </li>
+  </py:def>
+  <py:match path="body" once="false">
+    <body py:attrs="select('@*')">
+      <div class="bodywrapper">
+        <div class="header">
+          <span class="copyright">SSHg &copy; 2009 &mdash; UfSoft.org</span>
+          <ul class="nav" py:if="request.user">
+            <li>Rules</li>
+            <li>Repositories</li>
+            <li class="first">&nbsp;Accounts</li>
+            <li class="first">&nbsp;&mdash;</li>
+            ${ navigation('admin', 'Home') }
+            ${ navigation('account.prefs', 'My Account') }
+            <li class="first">
+              logged in as ${ request.user.username }
+              (<a href="${ url_for('account.logout') }">logout</a>)
+            </li>
+          </ul>
+        </div>
+        <div class="contents">
+          <py:if test="error">
+            <div class="message message-error">
+
+              ${ Markup(error) }
+            </div>
+          </py:if>
+          <py:for each="flash in request.session.pop('errors', [])">
+            <div class="message message-error">
+              ${ Markup(flash) }
+            </div>
+          </py:for>
+          <py:for each="flash in request.session.pop('flashes', [])">
+            <div class="message">
+
+              ${ Markup(flash) }
+            </div>
+          </py:for>
+          ${select('*|text()')}
+        </div>
+      </div>
+    </body>
+  </py:match>
+</html>
