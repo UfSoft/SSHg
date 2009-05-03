@@ -1,0 +1,46 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <title>New Account</title>
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>New Account</legend>
+      <form  action="" method="POST">
+        <table>
+          <tr>
+            <th>Username:</th>
+            <td><input type="text" name="username"/></td>
+          </tr>
+          <tr>
+            <th><label for="email">Email Address:</label></th>
+            <td><input type="text" name="email"/></td>
+          </tr>
+          <tr>
+            <th><label for="password">Password:</label></th>
+            <td>
+              <span>$password</span>
+              <input type="hidden" name="password" value="$password"/>
+            </td>
+          </tr>
+          <tr>
+            <th><label for="admin">Administrator</label></th>
+            <td><input type="checkbox" name="admin" value="yes"/></td>
+          </tr>
+        </table>
+        <div class="buttons">
+          <input type="submit" name="create" value="Create Account"/>
+        </div>
+      </form>
+    </fieldset>
+    <script type="text/javascript">
+      $(document).ready( function() {
+        $('textarea').each(function() {
+          $(this).width($(this).parent().width());
+        });
+      });
+    </script>
+  </body>
+</html>

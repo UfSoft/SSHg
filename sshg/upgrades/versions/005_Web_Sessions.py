@@ -23,7 +23,6 @@ class User(DeclarativeBase):
     last_login      = db.Column(db.DateTime, default=datetime.utcnow)
     locked_out      = db.Column(db.Boolean, default=False)
     is_admin        = db.Column(db.Boolean, default=False)
-    confirmed       = db.Column(db.Boolean, default=False)
 
     # Relationships
     session         = db.relation("Session", lazy=True, uselist=False,
@@ -36,8 +35,7 @@ class Change(DeclarativeBase):
     __tablename__ = 'user_changes'
 
     hash        = db.Column('id', db.String(32), primary_key=True)
-    name        = db.Column(db.String)
-    value       = db.Column(db.String)
+    changes     = db.Column(db.PickleType)
     created     = db.Column(db.DateTime, default=datetime.utcnow)
     owner_uid   = db.Column(None, db.ForeignKey('repousers.username'))
 
@@ -109,7 +107,6 @@ def upgrade():
     Session.__table__.create(migrate_engine)
     User.__table__.c.uuid.create(User.__table__)
     User.__table__.c.email.create(User.__table__)
-    User.__table__.c.confirmed.create(User.__table__)
 
     session = db.create_session(migrate_engine, autoflush=True,
                                 autocommit=False)
@@ -134,4 +131,3 @@ def downgrade():
     Session.__table__.drop(migrate_engine)
     User.__table__.c.uuid.drop(User.__table__)
     User.__table__.c.email.drop(User.__table__)
-    User.__table__.c.confirmed.drop(User.__table__)

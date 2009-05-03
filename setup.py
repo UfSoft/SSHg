@@ -22,7 +22,7 @@ setup(name=sshg.__package__,
       platforms="OS Independent - Anywhere Twisted and Mercurial is known to run.",
       keywords = "Twisted Mercurial SSH ACL HG",
       packages=['sshg'],
-      install_requires = ['simplejson', 'SQLAlchemy'], 
+      install_requires = ['simplejson', 'SQLAlchemy', 'decorator'],
       package_data={
           'sshg': ['upgrades/*.cfg']
       },

@@ -1,0 +1,55 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <title>Accounts</title>
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>Accounts</legend>
+      <form  action="" method="POST">
+        <table class="listing">
+          <thead>
+            <tr class="header">
+              <th class="sel">&nbsp;</th>
+              <th>Username</th>
+              <th py:if="request.user.is_admin">Email</th>
+              <th>Administrator</th>
+              <th>Manager</th>
+              <th>Locked Out</th>
+              <th py:if="request.user.is_admin">Last SSH Login</th>
+              <th py:if="request.user.is_admin">Last Web Login</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr py:for="account in accounts" class="${account.locked_out and 'locked' or None}">
+              <td class="sel">
+                 <input type="checkbox" name="sel" value="$account.username"
+                        disabled="${account is request.user and 'disabled' or None}"/>
+              </td>
+              <td>$account.username</td>
+              <td py:if="request.user.is_admin">$account.email</td>
+              <td>$account.is_admin</td>
+              <td>$account.is_manager</td>
+              <td>$account.locked_out</td>
+              <td py:if="request.user.is_admin" class="nowrap">
+                ${ format_datetime(account.last_login) }
+              </td>
+              <td py:if="request.user.is_admin" class="nowrap">
+                ${ format_datetime(account.session.last_visit) }
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="buttons">
+          <a href="${url_for('accounts.new')}"><button
+                type="button" name="create">Create New User</button></a>
+          <input type="submit" name="delete" value="Delete Selected Users"/>
+          <input type="submit" name="lock" value="Lock-out Selected Users"/>
+          <input type="submit" name="unlock" value="Un-Lock Selected Users"/>
+        </div>
+      </form>
+    </fieldset>
+  </body>
+</html>

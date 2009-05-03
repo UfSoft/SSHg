@@ -26,6 +26,8 @@ span.copyright {
   float: left;
 }
 
+a, a:hover, a:visited { text-decoration: none; }
+
 ul.nav { margin: 0; padding: 10px 5px 0 0; }
 ul.nav li {
   display: block; float: right;
@@ -58,6 +60,10 @@ div.contents div.message {
 div.contents div.message-error {
   background-image: url(imgs/error.png);
   background-color: #E8B5B5;
+}
+
+div.contents div.message-ok {
+  background-image: url(imgs/ok.png);
 }
 
 .frame { float: left; padding: 10px; }
@@ -95,13 +101,12 @@ fieldset.form { border: 1px solid #5d7685; }
   border-spacing: 0;
 }
 
+.form table td.nowrap { white-space: nowrap; }
+
 .form table.listing { border-bottom: 1px solid #D7D7D7; }
 
 .form table thead {
   background: #F7F7F0 none repeat scroll 0 0;
-  /*background-image: url(imgs/header.png);
-  background-position: bottom;
-  height: 45px;*/
   vertical-align: top;
   padding: 0 auto 0 auto;
 }
@@ -114,53 +119,25 @@ fieldset.form { border: 1px solid #5d7685; }
 .form table.listing tbody td, .form table.listing tbody th {
   border: 1px dotted #DDDDDD;
 }
-.form table .sel, .form table.listing th.sel { width: 1%; }
-.form table.listing th { width: 100%; }
-.form table tr.header th { text-align: center; }
-.form table tr th { text-align: right; white-space: nowrap; }
-.form table tr td { text-align: left; width: 85%; }
+.form table.listing tbody tr.locked, .form table.listing tbody tr.over-quota {
+  background-color: #E8B5B5;
+}
+.form table td.sel, .form table.listing th.sel { width: 1%; }
+.form table td, .form table.listing th { width: 20%; }
+/*.form table.listing th { width: 100%; }*/
+.form table tr.header th { text-align: center; padding: 2px 2px; }
+.form table tr th { text-align: right; white-space: nowrap; width: 1%; }
+.form table tr td { text-align: left; padding: 2px 2px; }
 .form table tr span.help {
   font-size: 60%; text-align: center; font-style: italic;
   padding-top: 15px; }
 div.buttons { margin-top: 20px; }
 
-/*
-.jquery-checkbox {
-  display: inline;
-  font-size: 24px;
-  line-height: 24px;
-  cursor: pointer;
-  cursor: hand;
-}
-.jquery-checkbox .mark {display: inline;}
-.jquery-checkbox img { vertical-align: middle; width: 22px; height: 21px; }
-.jquery-checkbox img { background: transparent url(imgs/checkboxes.png) no-repeat; }
-.jquery-checkbox img { background-position: 0px 0px; }
-.jquery-checkbox-hover img { background-position: 0px -21px; }
-.jquery-checkbox-checked img { background-position: 0px -43px; }
-.jquery-checkbox-checked .jquery-checkbox-hover img { background-position: 0px -43px; }
-.jquery-checkbox-disabled img{ background-position: 0px -64px; }
-.jquery-checkbox-checked .jquery-checkbox-disabled img{ background-position: 0px -85px; }
-*/
-div.abuse a, div.abuse a:visited {
-  font-size: 70%; color: #fff; text-decoration: none; font-weight: bold;
-}
-
-.admin table { font-size: 70%; }
-.admin table tr td { border-bottom: 1px solid #ccc; }
-.admin table tr th, .admin table tr td { white-space: nowrap; }
-.admin table tr th { white-space: nowrap; padding: 3px 4px; }
-.admin table tr td { padding: 0px 4px; vertical-align: middle; }
-.admin table tr th.sel, .admin table tr td.sel { width: 1px; padding-left: 4px; }
-.admin table.disk-usage { font-size: 90%; font-weight: normal; }
-.admin table.disk-usage tr td, .admin table.disk-usage tr th { text-align: center; }
-.admin table.disk-usage tr td { border-bottom: none; border-right: 1px solid #ccc; }
-.admin table.disk-usage tr td.last { border-right: none; }
-span.confirmed { color: lightgreen; }
-
-
 div.pubkey {
-  width: 250px;
+  width: 500px;
   overflow-y: hidden;
   overflow-x: auto;
+  white-space: nowrap;
 }
+
+a button { text-decoration: none; }

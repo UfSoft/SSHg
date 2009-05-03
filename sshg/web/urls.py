@@ -7,33 +7,45 @@
 # ==============================================================================
 
 from werkzeug.routing import Map, Rule, Submount
-from sshg.web import views
+from sshg.web.utils import require_admin, require_manager
+from sshg.web.views import account, accounts, admin, repos
 
 url_map = Map([
     Rule('/', endpoint='admin'),
     Rule('/shared/<file>', endpoint='shared', build_only=True),
     Submount('/account', [
+        Rule('/', endpoint="account.prefs"),
         Rule('/login', endpoint="account.login"),
         Rule('/logout', endpoint="account.logout"),
         Rule('/reset', endpoint="account.reset"),
-        Rule('/delete', endpoint="account.delete"),
-        Rule('/register', endpoint="account.register"),
-        Rule('/preferences', endpoint="account.prefs"),
-        Rule('/preferences/anonymous', endpoint="account.anonpref"),
-        Rule('/verify', endpoint="account.verify"),
         Rule('/confirm/', endpoint="account.confirm",
              defaults={'confirm_hash': None}),
         Rule('/confirm/<confirm_hash>', endpoint="account.confirm"),
     ]),
+    Submount('/accounts', [
+        Rule('/', endpoint='accounts.index'),
+        Rule('/new', endpoint='accounts.new')
+    ]),
+    Submount('/repos', [
+        Rule('/', endpoint='repos.index'),
+        #Rule('/new', endpoint='accounts.new')
+    ]),
 ])
 
 handlers = {
-    'admin': views.admin.index,
+    'admin': admin.index,
 
     # Authentication/Prefs Views
-    'account.login':    views.account.login,
-    'account.logout':   views.account.logout,
-    'account.prefs':    views.account.preferences,
-    'account.reset':    views.account.reset,
-    'account.confirm':  views.account.confirm,
+    'account.login':    account.login,
+    'account.logout':   account.logout,
+    'account.prefs':    account.preferences,
+    'account.reset':    account.reset,
+    'account.confirm':  account.confirm,
+
+    # Accounts administration
+    'accounts.index':   require_manager(accounts.index),
+    'accounts.new':     require_manager(accounts.new),
+
+    # Repositories Administration
+    'repos.index':      require_manager(repos.index),
 }

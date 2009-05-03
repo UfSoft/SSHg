@@ -7,13 +7,14 @@
 # ==============================================================================
 
 from os import path
+from decorator import decorator
 from genshi import Stream
 from genshi.filters.html import HTMLFormFiller
 from genshi.template import TemplateLoader, MarkupTemplate, NewTextTemplate
 from werkzeug.wrappers import BaseRequest, BaseResponse, ETagRequestMixin
 from werkzeug.local import Local, LocalManager
 from werkzeug.contrib.securecookie import SecureCookie
-from werkzeug.exceptions import NotFound, Unauthorized
+from werkzeug.exceptions import NotFound, Unauthorized, Forbidden
 from sshg import config, database as db, logger
 
 
@@ -72,9 +73,12 @@ def shared_url(filename):
 
 def format_datetime(obj):
     """Format a datetime object."""
-    return obj.strftime('%Y-%m-%d %H:%M:%S')
+    format = '%Y-%m-%d %H:%M:%S'
+    if request.user:
+        format = request.user.session.datetime_format.encode('utf-8')
+    return obj.strftime(format)
 
-def pretty_size(size, format='%.1f'):
+def pretty_size(size, format='%.2f'):
     if not size:
         return '0 bytes'
     jump = 512
@@ -87,9 +91,31 @@ def pretty_size(size, format='%.1f'):
         size /= 1024.
     return (format + ' %s') % (size, units[i - 1])
 
-def flash(message, error=False):
-    request.session.setdefault(error and 'errors' or 'flashes',
-                               []).append(message)
+def flash(message, error=False, msg=False):
+    key = 'infos'
+    if error and msg:
+        raise Exception("A flash msg cannot be error and msg at the same time")
+    elif error:
+        key = 'errors'
+    elif msg:
+        key = 'msgs'
+    request.session.setdefault(key, []).append(message)
+
+
+@decorator
+def require_manager(fn, request, *args, **kwargs):
+    log.debug(request.user)
+    if request.user.is_manager:
+        return fn(request, *args, **kwargs)
+    raise Forbidden()
+
+@decorator
+def require_admin(fn, request, *args, **kwargs):
+    log.debug(request.user)
+    if request.user.is_admin:
+        return fn(request, *args, **kwargs)
+    raise Forbidden()
+
 
 class Request(BaseRequest, ETagRequestMixin):
     user = None
@@ -110,11 +136,12 @@ class Request(BaseRequest, ETagRequestMixin):
         self.session.clear()
 
     def setup_cookie(self):
-        from sshg.web import session
         self.session = SecureCookie.load_cookie(
             self, config.web.cookie_name, config.web.secret_key.encode('utf-8')
         )
 
+    def load_persistent_sessions(self):
+        from sshg.web import session
         uuid = self.session.get('uuid', None)
         user = session.query(db.User).filter_by(uuid=uuid).first()
 
@@ -123,8 +150,7 @@ class Request(BaseRequest, ETagRequestMixin):
 
         self.login(user)
         self.user.session.update_last_visit()
-        if not self.user.email and not \
-                            self.user.changes.filter_by(name='email').first():
+        if not self.user.email and self.user.changes.count() < 1:
             flash("Please take the time to update your email address")
         session.commit()
 

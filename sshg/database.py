@@ -142,7 +142,7 @@ class Repository(DeclarativeBase):
     users    = db.relation("User", secondary=repousers_association,
                            backref=orm.backref("repos", lazy='dynamic'))
     managers = db.relation("User", secondary=repomanagers_association,
-                           backref=orm.backref("manages", lazy='dynamic'))
+                           backref=orm.backref("_manages", lazy='dynamic'))
     traffic  = db.relation("RepositoryTraffic",
                            backref=orm.backref("repo", lazy='dynamic'),
                            cascade="all, delete, delete-orphan")
@@ -166,6 +166,12 @@ class Repository(DeclarativeBase):
                 dir_size += path.getsize(filepath)
         self.size = dir_size
         return self.size
+
+    @property
+    def over_quota(self):
+        if self.quota == 0:
+            return False
+        return self.size > self.quota
 
     def __repr__(self):
         return ('<Repository Path: "%(path)s"  Size: %(size)s  '
@@ -224,7 +230,6 @@ class User(DeclarativeBase):
     last_login      = db.Column(db.DateTime, default=datetime.utcnow)
     locked_out      = db.Column(db.Boolean, default=False)
     is_admin        = db.Column(db.Boolean, default=False)
-    confirmed       = db.Column(db.Boolean, default=False)
 
     # Relationships
     keys            = db.relation("PublicKey", backref="owner",
@@ -236,15 +241,16 @@ class User(DeclarativeBase):
                                   backref=db.backref('user', uselist=False),
                                   cascade="all, delete, delete-orphan")
     changes         = db.relation("Change", backref='owner', lazy='dynamic',
-                                  cascade="all, delete, delete-orphan")
+                                  cascade="all, delete")
 
     # Relationships defined on other classes
-    manages = None
+    _manages = None
 
 
-    def __init__(self, username, password, is_admin=False):
+    def __init__(self, username, password, email, is_admin=False):
         self.username = username
         self.password = gen_pwhash(password)
+        self.email = email
         self.is_admin = is_admin
 
     def authenticate(self, password):
@@ -261,6 +267,12 @@ class User(DeclarativeBase):
                 'Locked: %(locked_out)s>' % self.__dict__)
 
     @property
+    def manages(self):
+        if self.is_admin:
+            return session().query(Repository)
+        return self._manages.filter(User.username==self.username)
+
+    @property
     def is_manager(self):
         if self.is_admin:
             return True
@@ -270,18 +282,18 @@ class Change(DeclarativeBase):
     __tablename__ = 'user_changes'
 
     hash        = db.Column('id', db.String(32), primary_key=True)
-    name        = db.Column(db.String)
-    value       = db.Column(db.String)
+    changes     = db.Column(db.PickleType)
     created     = db.Column(db.DateTime, default=datetime.utcnow)
     owner_uid   = db.Column(None, db.ForeignKey('repousers.username'))
 
     # ForeignKey Association
     owner = None # Defined on User.changes
 
-    def __init__(self, name=None, value=None):
+    def __init__(self, change_data):
         self.hash = uuid4().hex
-        self.name = name
-        self.value = value
+        if not isinstance(change_data, dict):
+            raise Exception("Change data must be a dictionary.")
+        self.changes = change_data
 
     def __url__(self, include_hash=True, **kwargs):
         from sshg.web.utils import url_for
@@ -290,9 +302,7 @@ class Change(DeclarativeBase):
                        **kwargs)
 
     def __repr__(self):
-        return '<UserChange name:"%s" value:"%s" dated %s>' % (self.name,
-                                                               self.value,
-                                                               self.created)
+        return '<UserChange Dated %s  DATA: %r>' % (self.created, self.changes)
 
 class AclRule(DeclarativeBase):
     __tablename__ = 'acl_rules'

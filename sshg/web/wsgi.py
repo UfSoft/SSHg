@@ -16,7 +16,7 @@ from sshg.web.urls import url_map, handlers
 from sshg.web.utils import (Request, Response, local, local_manager,
                             generate_template, url_for)
 from sqlalchemy.exceptions import InvalidRequestError
-from werkzeug.exceptions import HTTPException, NotFound, Unauthorized
+from werkzeug.exceptions import HTTPException, NotFound, Unauthorized, Forbidden
 from werkzeug.utils import ClosingIterator, SharedDataMiddleware, redirect
 
 from twisted.web import wsgi
@@ -60,15 +60,16 @@ class WSGIApplication(object):
         request.config = config
         request.notification = application.notification
         request.bind_to_context()
+        request.setup_cookie()
 
         self.url_adapter = url_map.bind_to_environ(environ)
 
         try:
             endpoint, params = self.url_adapter.match()
             try:
-                request.setup_cookie()
+                request.load_persistent_sessions()
             except Unauthorized:
-                # Allow login's raise on everything else
+                # Allow login's; raise on everything else
                 if endpoint not in ('account.login', 'account.reset',
                                     'account.confirm'):
                     raise
@@ -96,6 +97,8 @@ class WSGIApplication(object):
             #    410:    Resource Gone
         except Unauthorized:
             response = redirect(url_for('account.login'))
+        except Forbidden, e:
+            response = Response(generate_template('4xx.html', exception=e))
         except HTTPException, e:
             response = e.get_response(environ)
 

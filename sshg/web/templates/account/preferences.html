@@ -4,8 +4,6 @@
   <xi:include href="../layout.html" />
   <head>
     <title>Preferences</title>
-    <script type="text/javascript" src="${shared_url('js/jquery.js')}" />
-    <script type="text/javascript" src="${shared_url('js/jquery.checkbox.js')}" />
   </head>
   <body>
     <fieldset class="form">
@@ -42,13 +40,13 @@
             <th><label for="keys">Public Key(s):</label></th>
             <td>
               <table class="listing">
-                <thead>
+                <thead py:if="user.keys">
                   <tr class="header">
                     <th class="sel">&nbsp;</th>
                     <th id="td_width">Public Key(s)</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody py:if="user.keys">
                   <tr py:for="key in user.keys">
                     <td class="sel" width="1%">
                       <input type="checkbox" name="sel" value="$key.key"/>

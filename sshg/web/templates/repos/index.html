@@ -1,0 +1,46 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <title>Repositories</title>
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>Repositories</legend>
+      <form  action="" method="POST">
+        <table class="listing">
+          <thead>
+            <tr class="header">
+              <th class="sel">&nbsp;</th>
+              <th>Name</th>
+              <th>Path</th>
+              <th>Quota</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr py:for="repo in repos" class="${repo.over_quota and 'over-quota' or None}"
+                title="${repo.over_quota and 'Repository Over Quota!' or None}">
+              <td class="sel">
+                 <input type="checkbox" name="sel" value="$repo.name"
+                        disabled="${account is request.user and 'disabled' or None}"/>
+              </td>
+              <td>$repo.name</td>
+              <td class="nowrap">$repo.path</td>
+              <td>${ pretty_size(repo.quota) }</td>
+              <td>${ pretty_size(repo.size) }</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="buttons">
+          <a href="${url_for('accounts.new')}"><button
+                type="button" name="create">Create New User</button></a>
+          <input type="submit" name="delete" value="Delete Selected Users"/>
+          <input type="submit" name="lock" value="Lock-out Selected Users"/>
+          <input type="submit" name="unlock" value="Un-Lock Selected Users"/>
+        </div>
+      </form>
+    </fieldset>
+  </body>
+</html>
