@@ -11,7 +11,6 @@ from sshg.utils.crypto import gen_salt
 
 log = logger.getLogger(__name__)
 
-@require_manager
 def index(request):
     if request.method != 'POST':
         accounts = session.query(db.User).all()
@@ -68,8 +67,6 @@ def new(request):
               "one.", error=True)
         return generate_template("accounts/new.html", formfill=request.values)
 
-#    user = db.User(username, password, is_admin)
-#    user.confirmed = False
     change = db.Change({'username': username, 'password': password,
                         'is_admin': is_admin, 'email': email})
     session.add(change)
@@ -81,3 +78,41 @@ def new(request):
           "address. Until confirmed, your the account won't be created at "
           "all." % email)
     return redirect(url_for('accounts.index'))
+
+def edit(request, username):
+    account = session.query(db.User).get(username)
+    if request.method != 'POST':
+        return generate_template('accounts/edit.html', account=account)
+
+    if 'delete_keys' in request.values:
+        selection = request.values.getlist('sel')
+        for key in selection:
+            pubkey = session.query(db.PublicKey).get(key)
+            account.keys.remove(pubkey)
+        session.commit()
+        if selection:
+            flash("Public Key(s) deleted.", msg=True)
+        return generate_template('accounts/edit.html', account=account)
+    elif 'delete' in request.values:
+        session.delete(account)
+        flash("Account deleted.", msg=True)
+        return redirect(url_for('accounts.index'))
+
+    account.is_admin = request.values.get('is_admin') == 'yes'
+    account.locked_out = request.values.get('locked_out') == 'yes'
+    for line, key in enumerate(request.values.get('new_keys', '').splitlines()):
+        pubkey = db.PublicKey(key)
+        key_exists = session.query(db.PublicKey).get(pubkey.key)
+        if key_exists:
+            if key_exists.owner == account:
+                flash("You already have the public-key on line %d." % (line+1),
+                      error=True)
+            else:
+                flash("Someone is already using this public-key. Two diferent "
+                      "usernames?" % (line+1), error=True)
+        else:
+            account.keys.append(pubkey)
+            flash("Public Key(s) added.", msg=True)
+    session.commit()
+    flash("Account details updated.", msg=True)
+    return generate_template('accounts/edit.html', account=account)

@@ -28,7 +28,7 @@
                  <input type="checkbox" name="sel" value="$account.username"
                         disabled="${account is request.user and 'disabled' or None}"/>
               </td>
-              <td>$account.username</td>
+              <td><a href="${url_for('accounts.edit', username=account.username)}">$account.username</a></td>
               <td py:if="request.user.is_admin">$account.email</td>
               <td>$account.is_admin</td>
               <td>$account.is_manager</td>

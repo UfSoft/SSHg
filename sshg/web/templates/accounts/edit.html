@@ -3,55 +3,64 @@
       xmlns:xi="http://www.w3.org/2001/XInclude">
   <xi:include href="../layout.html" />
   <head>
-    <title>Preferences</title>
+    <title>Edit Account</title>
   </head>
   <body>
     <fieldset class="form">
-      <legend>Tweak Your Preferences</legend>
+      <legend>Edit Account</legend>
       <form  action="" method="POST">
         <table>
           <tr>
             <th>Username:</th>
-            <td>${ user.username }</td>
+            <td>${ account.username }</td>
           </tr>
           <tr>
             <th><label for="email">Email:</label></th>
-            <td>
-              <input type="text" name="email" value="${ user.email }"/>
-            </td>
-          </tr>
-          <tr>
-            <th><label for="password">Password:</label></th>
-            <td><input type="password" name="password"/></td>
-          </tr>
-          <tr>
-            <th><label for="password_confirm">Confirm Password:</label></th>
-            <td><input type="password" name="password_confirm"/></td>
+            <td>${ account.email }</td>
           </tr>
             <th><label for="datetime_format">Datetime Format:</label></th>
             <td><input type="text" name="datetime_format" disabled="disabled"
-                       value="${ request.user.session.datetime_format }"/></td>
+                       value="${ account.session.datetime_format }"/></td>
           <tr>
             <th><label for="language">Language:</label></th>
             <td><input type="text" name="language" disabled="disabled"
-                       value="${ request.user.session.language }"/></td>
+                       value="${ account.session.language }"/></td>
+          </tr>
+          <tr>
+            <th><label for="is_admin">Administrator:</label></th>
+            <td>
+              <!--! Only admins can promote or not users to administrators  -->
+              <input type="checkbox" name="is_admin" value="yes"
+                     disabled="${ not request.user.is_admin and 'disabled' or None }"
+                     checked="${ account.is_admin and 'checked' or None }"/>
+            </td>
+          </tr>
+          <tr py:if="request.user != account">
+            <!--! Don't touch our own account  -->
+            <th><label for="locked_out">Locked Out:</label></th>
+            <td>
+              <!--! Only admins can lock admins  -->
+              <input type="checkbox" name="locked_out" value="yes"
+                     disabled="${ request.user.is_admin and None or (account.is_admin and 'disabled' or None) }"
+                     checked="${ account.locked_out and 'checked' or None }"/>
+            </td>
           </tr>
           <tr>
             <th><label for="keys">Public Key(s):</label></th>
             <td>
               <table class="listing">
-                <thead py:if="user.keys">
+                <thead py:if="account.keys">
                   <tr class="header">
                     <th class="sel">&nbsp;</th>
                     <th id="td_width">Public Key(s)</th>
                   </tr>
                 </thead>
-                <tbody py:if="user.keys">
-                  <tr py:for="key in user.keys">
+                <tbody py:if="account.keys">
+                  <tr py:for="key in account.keys">
                     <td class="sel">
                       <input type="checkbox" name="sel" value="$key.key"/>
                     </td>
-                    <td><div class="pubkey">$key.key</div></td>
+                    <td width="100%"><div class="pubkey">$key.key</div></td>
                   </tr>
                 </tbody>
                 <thead>

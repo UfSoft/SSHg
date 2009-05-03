@@ -7,3 +7,5 @@ twistd.*
 **/*.mo
 flex/deploy
 TestProject/**/*
+**/*.to_remove
+*.to_remove
