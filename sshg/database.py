@@ -19,11 +19,12 @@ from types import ModuleType
 from uuid import uuid4
 
 import sqlalchemy
+from sqlalchemy import and_, or_
 from sqlalchemy import orm
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
 
-from sshg import logger
+from sshg import logger, exceptions
 from sshg.utils.crypto import gen_pwhash, check_pwhash
 
 from twisted.conch.ssh.keys import Key
@@ -93,6 +94,9 @@ for mod in sqlalchemy, orm:
         if key in mod.__all__:
             setattr(db, key, value)
 del key, mod, value
+db.and_ = and_
+db.or_ = or_
+#del and_, or_
 
 
 DeclarativeBase = declarative_base()
@@ -152,7 +156,12 @@ class Repository(DeclarativeBase):
     def __init__(self, name, repo_path, quota=0, incoming_quota=0,
                  outgoing_quota=0):
         self.name = name
-        self.path = repo_path
+        if not path.isdir(repo_path):
+            raise exceptions.InvalidRepositoryPath
+        elif not path.isdir(path.join(repo_path, '.hg')):
+            raise exceptions.InvalidRepository
+        else:
+            self.path = repo_path.rstrip('/')
         self.quota = quota
         self.incoming_quota = incoming_quota
         self.outgoing_quota = outgoing_quota

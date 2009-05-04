@@ -1,0 +1,57 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <title>New Repository</title>
+    <script type="text/javascript">
+      function readable_size(bytes) {
+        bytes = parseFloat(bytes) || 0.0;
+        $('#quota').val(bytes.toFixed(0));
+        if ( bytes == 0.0 ) {
+          return 'unlimited size';
+        };
+        var unit;
+        var units = ['bytes', 'KB', 'MB', 'GB', 'TB']; //, 'PB', 'EB', 'ZB', 'YB'];
+        for ( idx=1; idx &lt; units.length-1; idx++ ) {
+          if ( bytes &lt; 1024 ) break;
+          unit = idx;
+          bytes /= 1024;
+        };
+        return bytes + ' ' + units[unit || 0];
+      };
+      $(document).ready(function() {
+        $('#quota').keyup(function(event) {
+          $('#quota-help').html(readable_size($(this).val()));
+        });
+      })
+    </script>
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>New Repository</legend>
+      <form  action="" method="POST">
+        <table>
+          <tr>
+            <th><label for="reponame">Name:</label></th>
+            <td><input type="text" name="reponame"/></td>
+          </tr>
+          <tr>
+            <th><label for="repopath">Path:</label></th>
+            <td><input type="text" name="repopath"/></td>
+          </tr>
+          <tr>
+            <th><label for="quota">Quota:</label></th>
+            <td>
+              <input id="quota" type="text" name="quota" value="0"/>
+              <span class="help" id="quota-help">unlimited size</span>
+            </td>
+          </tr>
+        </table>
+        <div class="buttons">
+          <input type="submit" name="create" value="Create Repository"/>
+        </div>
+      </form>
+    </fieldset>
+  </body>
+</html>

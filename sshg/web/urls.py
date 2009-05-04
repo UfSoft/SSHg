@@ -29,7 +29,8 @@ url_map = Map([
     ]),
     Submount('/repos', [
         Rule('/', endpoint='repos.index'),
-        #Rule('/new', endpoint='accounts.new')
+        Rule('/new', endpoint='repos.new'),
+        Rule('/edit/<reponame>', endpoint='repos.edit'),
     ]),
 ])
 
@@ -50,4 +51,6 @@ handlers = {
 
     # Repositories Administration
     'repos.index':      require_manager(repos.index),
+    'repos.new':        require_admin(repos.new),
+    'repos.edit':       require_admin(repos.edit),
 }

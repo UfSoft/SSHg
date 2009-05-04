@@ -3,11 +3,11 @@
       xmlns:xi="http://www.w3.org/2001/XInclude">
   <xi:include href="../layout.html" />
   <head>
-    <title>Repositories</title>
+    <title>Managed Repositories</title>
   </head>
   <body>
     <fieldset class="form">
-      <legend>Repositories</legend>
+      <legend>Managed Repositories</legend>
       <form  action="" method="POST">
         <table class="listing">
           <thead>
@@ -26,7 +26,7 @@
                  <input type="checkbox" name="sel" value="$repo.name"
                         disabled="${account is request.user and 'disabled' or None}"/>
               </td>
-              <td>$repo.name</td>
+              <td><a href="${ url_for('repos.edit', reponame=repo.name)}">$repo.name</a></td>
               <td class="nowrap">$repo.path</td>
               <td>${ pretty_size(repo.quota) }</td>
               <td>${ pretty_size(repo.size) }</td>
@@ -34,11 +34,9 @@
           </tbody>
         </table>
         <div class="buttons">
-          <a href="${url_for('accounts.new')}"><button
-                type="button" name="create">Create New User</button></a>
-          <input type="submit" name="delete" value="Delete Selected Users"/>
-          <input type="submit" name="lock" value="Lock-out Selected Users"/>
-          <input type="submit" name="unlock" value="Un-Lock Selected Users"/>
+          <a href="${url_for('repos.new')}"><button
+                type="button" name="create">Create New Repository</button></a>
+          <input type="submit" name="delete" value="Delete Selected"/>
         </div>
       </form>
     </fieldset>
