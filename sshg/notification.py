@@ -15,6 +15,7 @@ from twisted.mail.smtp import ESMTPSenderFactory
 
 from OpenSSL.SSL import SSLv3_METHOD, TLSv1_METHOD
 
+from sshg import __package__, __version__
 from sshg.web.utils import generate_template
 
 
@@ -69,17 +70,18 @@ class NotificationSystem(object):
 #            return self.format_header(key, mo.group(1), mo.group(2))
         return self._format_header(key, value)
 
-    def sendmail(self, subject, template, data, to, mime_headers={}):
+    def sendmail(self, subject, template, data, to_addrs, mime_headers={}):
         from email.mime.text import MIMEText
         from email.utils import formatdate
         from sshg import config
+        if isinstance(to_addrs, basestring):
+            to_addrs = [to_addrs]
         stream = generate_template('email/%s' % template, **data)
         body = stream.render('text')
-#        body = content
         headers = {}
-        headers['X-Mailer'] = 'SSHg %s, by UfSoft.org'
-        headers['X-Screener-Version'] = '0.1'
-#        headers['X-URL']
+        headers['X-Mailer'] = '%s %s, by UfSoft.org' % (__package__,
+                                                        __version__)
+        headers['X-Screener-Version'] = __version__
         headers['Precedence'] = 'bulk'
         headers['Auto-Submitted'] = 'auto-generated'
         headers['Subject'] = subject
@@ -87,9 +89,7 @@ class NotificationSystem(object):
                            config.notification.smtp_from)
         headers['Reply-To'] = config.notification.reply_to
 
-#        recipients = torcpts
-#        headers['To'] = ', '.join(torcpts)
-        headers['To'] = to
+        headers['To'] = ', '.join(to_addrs)
         headers['Date'] = formatdate()
         if not self._charset.body_encoding:
             try:
@@ -109,7 +109,7 @@ class NotificationSystem(object):
         msgtext = CRLF = '\r\n'.join(RECRLF.split(msgtext))
         self._sendmail(to, StringIO(msgtext))
 
-    def _sendmail(self, to, email_msg_file):
+    def _sendmail(self, to_addrs, email_msg_file):
         from sshg import config
         deferred = defer.Deferred()
         contextFactory = ClientContextFactory()
@@ -123,7 +123,7 @@ class NotificationSystem(object):
             config.notification.smtp_user,
             config.notification.smtp_pass,
             config.notification.smtp_from,
-            to,
+            to_addrs,
             email_msg_file,
             deferred,
             retries=5,
