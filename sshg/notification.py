@@ -13,7 +13,7 @@ from twisted.internet import defer, reactor
 from twisted.internet.ssl import ClientContextFactory
 from twisted.mail.smtp import ESMTPSenderFactory
 
-from OpenSSL.SSL import SSLv3_METHOD, TLSv1_METHOD
+from OpenSSL.SSL import SSLv3_METHOD
 
 from sshg import __package__, __version__
 from sshg.web.utils import generate_template
@@ -29,7 +29,6 @@ class NotificationSystem(object):
         cn = config.notification
         if not cn.smtp_from and not cn.reply_to:
             self.enabled = False
-
         self._charset = Charset()
         self._charset.input_charset = 'utf-8'
         self._charset.header_encoding = BASE64
@@ -65,9 +64,6 @@ class NotificationSystem(object):
             for v in value:
                 items.append(self._encode_header(v))
             return ',\n\t'.join(items)
-#        mo = self.longaddr_re.match(value)
-#        if mo:
-#            return self.format_header(key, mo.group(1), mo.group(2))
         return self._format_header(key, value)
 
     def sendmail(self, subject, template, data, to_addrs, mime_headers={}):
@@ -98,7 +94,7 @@ class NotificationSystem(object):
                 raise Exception("Failed to encode body")
         msg = MIMEText(body, 'plain')
         # Message class computes the wrong type from MIMEText constructor,
-        # which does not take a Charset object as initializer. Reset the
+        # which does not take a Charset object as initialiser. Reset the
         # encoding type to force a new, valid evaluation
         del msg['Content-Transfer-Encoding']
         msg.set_charset(self._charset)
@@ -107,7 +103,7 @@ class NotificationSystem(object):
         msgtext = msg.as_string()
         # Ensure the message complies with RFC2822: use CRLF line endings
         msgtext = CRLF = '\r\n'.join(RECRLF.split(msgtext))
-        self._sendmail(to, StringIO(msgtext))
+        self._sendmail(to_addrs, StringIO(msgtext))
 
     def _sendmail(self, to_addrs, email_msg_file):
         from sshg import config
