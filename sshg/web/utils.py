@@ -9,6 +9,7 @@
 from os import path
 from decorator import decorator
 from genshi import Stream
+from genshi.builder import tag
 from genshi.filters.html import HTMLFormFiller
 from genshi.template import TemplateLoader, MarkupTemplate, NewTextTemplate
 from werkzeug.wrappers import BaseRequest, BaseResponse, ETagRequestMixin
@@ -106,6 +107,15 @@ def flash(message, error=False, msg=False):
 def require_manager(fn, request, *args, **kwargs):
     log.debug(request.user)
     if request.user.is_manager:
+        if request.endpoint == 'repos.edit':
+            if not request.user.manages.filter_by(name=args[0]).first():
+                raise Forbidden()
+        elif request.endpoint == 'accounts.edit':
+            from sshg.web import session
+            account = session().query(db.User).get(args[0])
+            if account and not account.can_be_managed_by(request.user):
+                raise Forbidden("You do not have the required permission to "
+                                "manage this account.")
         return fn(request, *args, **kwargs)
     raise Forbidden()
 
@@ -151,7 +161,9 @@ class Request(BaseRequest, ETagRequestMixin):
         self.login(user)
         self.user.session.update_last_visit()
         if not self.user.email and self.user.changes.count() < 1:
-            flash("Please take the time to update your email address")
+            flash(tag("Please take the time to ",
+                      tag.a("update", href=url_for('account.prefs')),
+                      " your email address."))
         session.commit()
 
 class Response(BaseResponse):
