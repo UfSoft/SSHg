@@ -65,4 +65,74 @@ def new(request):
     return redirect(url_for('repos.index'))
 
 def edit(request, reponame):
-    pass
+    repo = session.query(db.Repository).get(reponame)
+
+    if request.method != 'POST':
+        users = session.query(db.User).all()
+        return generate_template('repos/edit.html', repo=repo, users=users)
+
+    if 'update' in request.values:
+        repo.quota = int(request.values.get('quota', repo.quota))
+        flash("Updated repository details", msg=True)
+
+    elif 'update_users' in request.values:
+        deleted_users = []
+        added_users = []
+        users = request.values.getlist('users')
+        log.debug('Users: %s', users)
+        for idx, user in enumerate(repo.users):
+            if user.username in users:
+                users.pop(users.index(user.username))
+            else:
+                deleted_users.append(user)
+
+        if users:
+            for username in users:
+                added_users.append(username)
+                user = session.query(db.User).get(username)
+                repo.users.append(user)
+            session.commit()
+
+        if deleted_users:
+            for user in deleted_users:
+                repo.users.pop(repo.users.index(user))
+            session.commit()
+            flash("Removed users: %s" % ', '.join([u.username for u in
+                                                   deleted_users]), msg=True)
+
+        if added_users:
+            flash("Added users: %s" % ', '.join(added_users), msg=True)
+
+        managers = request.values.getlist('managers')
+        deleted_managers = []
+        added_managers = []
+        log.debug('Managers: %s -- %s', managers, repo.managers)
+
+        for manager in repo.managers:
+            log.debug("Processing manager %s", manager)
+            if manager.username in managers:
+                managers.pop(managers.index(manager.username))
+            else:
+                deleted_managers.append(manager)
+                session.commit()
+
+        if managers:
+            for username in managers:
+                added_managers.append(username)
+                user = session.query(db.User).get(username)
+                repo.managers.append(user)
+            session.commit()
+
+        if deleted_managers:
+            for manager in deleted_managers:
+                repo.managers.pop(repo.managers.index(manager))
+            session.commit()
+            flash("Removed managers: %s" % ', '.join([m.username for m in
+                                                      deleted_managers]),
+                  msg=True)
+        if added_managers:
+            flash("Added managers: %s" % ', '.join(added_managers), msg=True)
+
+
+    users = session.query(db.User).all()
+    return generate_template('repos/edit.html', repo=repo, users=users)

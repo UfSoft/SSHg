@@ -3,23 +3,9 @@
       xmlns:xi="http://www.w3.org/2001/XInclude">
   <xi:include href="../layout.html" />
   <head>
+    <script type="text/javascript" src="${shared_url('js/sshg.js')}" />
     <title>New Repository</title>
     <script type="text/javascript">
-      function readable_size(bytes) {
-        bytes = parseFloat(bytes) || 0.0;
-        $('#quota').val(bytes.toFixed(0));
-        if ( bytes == 0.0 ) {
-          return 'unlimited size';
-        };
-        var unit;
-        var units = ['bytes', 'KB', 'MB', 'GB', 'TB']; //, 'PB', 'EB', 'ZB', 'YB'];
-        for ( idx=1; idx &lt; units.length-1; idx++ ) {
-          if ( bytes &lt; 1024 ) break;
-          unit = idx;
-          bytes /= 1024;
-        };
-        return bytes + ' ' + units[unit || 0];
-      };
       $(document).ready(function() {
         $('#quota').keyup(function(event) {
           $('#quota-help').html(readable_size($(this).val()));

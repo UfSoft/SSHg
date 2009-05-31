@@ -24,7 +24,7 @@ from sqlalchemy import orm
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.engine.url import make_url, URL
 
-from sshg import logger, exceptions
+from sshg import logger, exceptions, config
 from sshg.utils.crypto import gen_pwhash, check_pwhash
 
 from twisted.conch.ssh.keys import Key
@@ -43,7 +43,6 @@ def get_engine():
     return application.database_engine
 
 def create_engine():
-    from sshg.service import config
     if config.db.engine == 'sqlite':
         info = URL('sqlite', database=path.join(config.db.path, config.db.name))
     else:
@@ -139,6 +138,7 @@ class Repository(DeclarativeBase):
     size            = db.Column(db.Integer, default=0)
     quota           = db.Column(db.Integer, default=0)
     added_on        = db.Column(db.DateTime, default=datetime.utcnow)
+    added_by_       = db.Column(db.ForeignKey('repousers.username'))
     incoming_quota  = db.Column(db.Integer, default=0)
     outgoing_quota  = db.Column(db.Integer, default=0)
 
@@ -152,6 +152,8 @@ class Repository(DeclarativeBase):
                            cascade="all, delete, delete-orphan")
     rules    = db.relation("AclRule", backref="repo", lazy='dynamic',
                            cascade="all, delete, delete-orphan")
+    added_by = db.relation("User", backref="added_repos", uselist=False,
+                           lazy=False)
 
     def __init__(self, name, repo_path, quota=0, incoming_quota=0,
                  outgoing_quota=0):
@@ -183,8 +185,8 @@ class Repository(DeclarativeBase):
         return self.size > self.quota
 
     def __repr__(self):
-        return ('<Repository Path: "%(path)s"  Size: %(size)s  '
-                'Quota: %(quota)s>' % self.__dict__)
+        return ('<Repository Name: "%(name)s"  Path: "%(path)s"  '
+                'Size: %(size)s  Quota: %(quota)s>' % self.__dict__)
 
 
 class RepositoryTraffic(DeclarativeBase):
@@ -231,36 +233,42 @@ class User(DeclarativeBase):
     """Repositories users table"""
     __tablename__ = 'repousers'
 
-    username        = db.Column(db.String, primary_key=True)
-    uuid            = db.Column(db.String(32), default=lambda: uuid4().hex)
-    email           = db.Column(db.String)
-    password        = db.Column(db.String)
-    added_on        = db.Column(db.DateTime, default=datetime.utcnow)
-    last_login      = db.Column(db.DateTime, default=datetime.utcnow)
-    locked_out      = db.Column(db.Boolean, default=False)
-    is_admin        = db.Column(db.Boolean, default=False)
+    username         = db.Column(db.String, primary_key=True)
+    uuid             = db.Column(db.String(32), default=lambda: uuid4().hex)
+    email            = db.Column(db.String)
+    password         = db.Column(db.String)
+    added_on         = db.Column(db.DateTime, default=datetime.utcnow)
+    creator          = db.Column(db.ForeignKey('repousers.username'))
+    last_login       = db.Column(db.DateTime, default=datetime.utcnow)
+    locked_out       = db.Column(db.Boolean, default=False)
+    is_admin         = db.Column(db.Boolean, default=False)
 
     # Relationships
-    keys            = db.relation("PublicKey", backref="owner",
-                                  cascade="all, delete, delete-orphan")
-    last_used_key   = db.relation("PublicKey", uselist=False)
-    rules           = db.relation("AclRule", backref="user", lazy='dynamic',
-                                  cascade="all, delete, delete-orphan")
-    session         = db.relation("Session", lazy=True, uselist=False,
-                                  backref=db.backref('user', uselist=False),
-                                  cascade="all, delete, delete-orphan")
-    changes         = db.relation("Change", backref='owner', lazy='dynamic',
-                                  cascade="all, delete")
+    created_accounts = db.relation("User", backref=db.backref(
+                                       "created_by",
+                                       remote_side="User.username"))
+    keys             = db.relation("PublicKey", backref="owner",
+                                   cascade="all, delete, delete-orphan")
+    last_used_key    = db.relation("PublicKey", uselist=False)
+    rules            = db.relation("AclRule", backref="user", lazy='dynamic',
+                                   cascade="all, delete, delete-orphan")
+    session          = db.relation("Session", lazy=True, uselist=False,
+                                   backref=db.backref('user', uselist=False),
+                                   cascade="all, delete, delete-orphan")
+    changes          = db.relation("Change", backref='owner', lazy='dynamic',
+                                   cascade="all, delete")
 
     # Relationships defined on other classes
     _manages = None
 
 
-    def __init__(self, username, password, email, is_admin=False):
+    def __init__(self, username, password, email, is_admin=False,
+                 created_by=None):
         self.username = username
         self.password = gen_pwhash(password)
         self.email = email
         self.is_admin = is_admin
+        self.created_by = created_by
 
     def authenticate(self, password):
         valid = check_pwhash(self.password, password)
@@ -286,6 +294,19 @@ class User(DeclarativeBase):
         if self.is_admin:
             return True
         return self.manages.count() > 0
+
+    @property
+    def is_app_admin(self):
+        return self.username == config.app_manager
+
+    def can_be_managed_by(self, user):
+        if self.is_app_admin and not user.is_app_admin:
+            # Non application admins cannot delete the application admin
+            return False
+        # A user cannot manage(delete) himself but can manage accounts
+        # he created. If `user` is the application admin, he can manage anyone
+        return user is not self and (user.is_admin or
+                                     self in user.created_accounts)
 
 class Change(DeclarativeBase):
     __tablename__ = 'user_changes'

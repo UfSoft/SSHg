@@ -1,0 +1,103 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:py="http://genshi.edgewall.org/"
+      xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="../layout.html" />
+  <head>
+    <script type="text/javascript" src="${shared_url('js/sshg.js')}" />
+    <title>Edit Repository</title>
+    <script type="text/javascript">
+      $(document).ready(function() {
+        $('#quota').keyup(function(event) {
+          $('#quota-help').html(readable_size('#quota', $(this).val()));
+        });
+        $('#size').keyup(function(event) {
+          $('#size-help').html(readable_size('#size', $(this).val()));
+        });
+        $('#quota').keyup();
+        $('#size').keyup();
+      })
+    </script>
+  </head>
+  <body>
+    <fieldset class="form">
+      <legend>Edit Repository</legend>
+
+      <fieldset style="float: right;">
+        <legend>Repository Managers and Users</legend>
+        <form action="" method="POST">
+          <table class="listing">
+            <thead>
+              <tr class="header">
+                <th class="sel" title="Add to selection">S</th>
+                <th class="sel" title="Is Manager">M</th>
+                <th>Username</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr py:for="user in users">
+                <td class="sel" title="Add to selection">
+                  <input type="checkbox" name="users" value="$user.username"
+                         checked="${user in repo.users and 'checked' or None}"
+                         py:if="user is not request.user"/>
+                </td>
+                <td class="sel" title="Is Manager">
+                  <input type="checkbox" name="managers" value="$user.username"
+                         checked="${user in repo.managers and 'checked' or None}"
+                         py:if="user is not request.user"/>
+                </td>
+                <td>$user.username</td>
+              </tr>
+            </tbody>
+          </table>
+        <div class="buttons">
+          <input type="submit" name="update_users"
+                 value="Update Repository Users"/>
+        </div>
+        </form>
+      </fieldset>
+
+      <form  action="" method="POST">
+        <table>
+          <tr>
+            <th><label for="reponame">Name:</label></th>
+            <td>$repo.name</td>
+          </tr>
+          <tr>
+            <th><label for="repopath">Path:</label></th>
+            <td>$repo.path</td>
+          </tr>
+          <tr>
+            <th><label for="quota">Quota:</label></th>
+            <td>
+              <input id="quota" name="quota" value="$repo.quota"
+                     type="${request.user.is_admin and 'text' or 'hidden'}"/>
+              <span py:if="not request.user.is_admin">$repo.quota</span>
+              <span class="help" id="quota-help">unlimited size</span>
+            </td>
+          </tr>
+          <tr>
+            <th><label for="size">Size:</label></th>
+            <td>
+              <span>$repo.size</span>
+              <input id="size" name="size" value="$repo.size" type="hidden"/>
+              <span class="help" id="size-help">unlimited size</span>
+            </td>
+          </tr>
+          <tr>
+            <th><label for="added_on">Added On:</label></th>
+            <td>${ format_datetime(repo.added_on) }</td>
+          </tr>
+          <tr>
+            <th><label for="added_by">Added By:</label></th>
+            <td>$repo.added_by.username</td>
+          </tr>
+        </table>
+        <div class="buttons" style="clear:right; float: left;">
+          <input type="submit" name="update" value="Update Repository Details"/>
+          <a href="${url_for('accounts.new')}"><button
+                type="button" name="rules">Repository ACL Rules</button></a>
+        </div>
+      </form>
+    </fieldset>
+  </body>
+</html>

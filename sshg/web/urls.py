@@ -52,5 +52,5 @@ handlers = {
     # Repositories Administration
     'repos.index':      require_manager(repos.index),
     'repos.new':        require_admin(repos.new),
-    'repos.edit':       require_admin(repos.edit),
+    'repos.edit':       require_manager(repos.edit),
 }

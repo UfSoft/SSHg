@@ -68,7 +68,9 @@ def new(request):
         return generate_template("accounts/new.html", formfill=request.values)
 
     change = db.Change({'username': username, 'password': password,
-                        'is_admin': is_admin, 'email': email})
+                        'is_admin': is_admin, 'email': email,
+                        'creator': request.user.uuid})
+
     session.add(change)
     session.commit()
     request.notification.sendmail("Account Create Confirmation",

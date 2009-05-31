@@ -170,6 +170,9 @@ class SetupOptions(BaseOptions):
         )
 
         session.commit()
+
+        config.parser.set('main', 'app_manager', username)
+        config.parser.write(open(config.file, 'w'))
         print "Done"
         sys.exit()
 
@@ -274,6 +277,7 @@ class SSHgOptions(BaseOptions):
         ["server", None, ServiceOptions, ServiceOptions.longdesc],
         ["upgrade", None, UpgradeOptions, UpgradeOptions.longdesc],
     ]
+
     defaultSubCommand = "server"
 
     def opt_config_dir(self, configdir):
@@ -293,6 +297,7 @@ class SSHgOptions(BaseOptions):
             parser.set('main', 'port', '22')
             parser.set('main', 'private_key', '%(here)s/privatekey.pem')
             parser.set('main', 'motd_file', '%(here)s/motd.txt')
+            parser.set('main', 'app_manager', '')
 
             motd_file = join(configdir, 'motd.txt')
             if not isfile(motd_file):
@@ -346,6 +351,7 @@ class SSHgOptions(BaseOptions):
 
         config.port = parser.getint('main', 'port')
         config.private_key = abspath(parser.get('main', 'private_key'))
+        config.app_manager = parser.get('main', 'app_manager')
 
         motd = abspath(parser.get('main', 'motd_file'))
         if isfile(motd):

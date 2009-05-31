@@ -26,7 +26,7 @@
             <td><input type="text" name="language" disabled="disabled"
                        value="${ account.session.language }"/></td>
           </tr>
-          <tr>
+          <tr py:if="request.user.is_app_admin">
             <th><label for="is_admin">Administrator:</label></th>
             <td>
               <!--! Only admins can promote or not users to administrators  -->

@@ -15,6 +15,7 @@
               <th class="sel">&nbsp;</th>
               <th>Name</th>
               <th>Path</th>
+              <th>Added By</th>
               <th>Quota</th>
               <th>Size</th>
             </tr>
@@ -28,6 +29,7 @@
               </td>
               <td><a href="${ url_for('repos.edit', reponame=repo.name)}">$repo.name</a></td>
               <td class="nowrap">$repo.path</td>
+              <td>${ repo.added_by.username }</td>
               <td>${ pretty_size(repo.quota) }</td>
               <td>${ pretty_size(repo.size) }</td>
             </tr>

@@ -18,6 +18,7 @@
               <th>Administrator</th>
               <th>Manager</th>
               <th>Locked Out</th>
+              <th>Created By</th>
               <th py:if="request.user.is_admin">Last SSH Login</th>
               <th py:if="request.user.is_admin">Last Web Login</th>
             </tr>
@@ -26,13 +27,17 @@
             <tr py:for="account in accounts" class="${account.locked_out and 'locked' or None}">
               <td class="sel">
                  <input type="checkbox" name="sel" value="$account.username"
-                        disabled="${account is request.user and 'disabled' or None}"/>
+                        py:if="account.can_be_managed_by(request.user)"/>
               </td>
-              <td><a href="${url_for('accounts.edit', username=account.username)}">$account.username</a></td>
+              <td>
+                <a href="${url_for('accounts.edit', username=account.username)}"
+                   py:strip="not account.can_be_managed_by(request.user)">$account.username</a>
+              </td>
               <td py:if="request.user.is_admin">$account.email</td>
               <td>$account.is_admin</td>
               <td>$account.is_manager</td>
               <td>$account.locked_out</td>
+              <td>$account.created_by.username</td>
               <td py:if="request.user.is_admin" class="nowrap">
                 ${ format_datetime(account.last_login) }
               </td>
